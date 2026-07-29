@@ -1,0 +1,214 @@
+.btn-docs {
+    padding: 0.25rem 0.6rem;
+    font-size: 0.8rem;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-secondary);
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.15s, color 0.15s;
+}
+
+.btn-docs:hover,
+.btn-docs--active {
+    background: var(--teal-800);
+    color: var(--teal-200);
+    border-color: var(--teal-600);
+}
+
+.doc-expand-row {
+    display: none;
+}
+
+.doc-expand-row.doc-expand-row--open {
+    display: table-row;
+}
+
+.doc-expand-row td {
+    padding: 0;
+    border-bottom: 1px solid var(--color-border);
+}
+
+.doc-expand-row details {
+    padding: 0;
+}
+
+.doc-summary {
+    padding: 0.4rem 1rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    list-style: none;
+    background: var(--color-bg-subtle);
+    user-select: none;
+}
+
+.doc-summary::-webkit-details-marker {
+    display: none;
+}
+
+.doc-summary::before {
+    content: "▶ ";
+    font-size: 0.65rem;
+}
+
+details[open] .doc-summary::before {
+    content: "▼ ";
+}
+
+.doc-list-content {
+    padding: 0.75rem 1rem;
+    background: var(--purple-900);
+}
+
+.doc-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+
+.doc-table th {
+    text-align: left;
+    padding: 0.4rem 0.75rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-muted);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.doc-table td {
+    padding: 0.4rem 0.75rem;
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-primary);
+    vertical-align: middle;
+}
+
+.doc-table td code {
+    font-family: ui-monospace, monospace;
+    font-size: 0.75rem;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-subtle);
+    padding: 0.1rem 0.3rem;
+    border-radius: 3px;
+}
+
+.doc-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.doc-table tbody tr:hover td {
+    background: var(--color-bg-elevated);
+}
+
+.doc-table tbody tr.doc-row-link {
+    cursor: pointer;
+}
+
+.doc-table tbody tr.doc-row-link:hover td {
+    background: var(--teal-900);
+}
+
+.json-editor-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.65);
+}
+
+.json-editor-dialog {
+    width: min(1000px, 92vw);
+    height: min(80vh, 820px);
+    display: flex;
+    flex-direction: column;
+    gap: 0.625rem;
+    padding: 0.75rem;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+}
+
+.json-editor-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.json-editor-textarea {
+    width: 100%;
+    flex: 1 1 auto;
+    resize: none;
+    padding: 0.625rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--purple-900);
+    color: var(--color-text-primary);
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    line-height: 1.35;
+}
+
+.json-editor-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.json-editor-button {
+    min-width: 80px;
+}
+
+.json-quick-edit-overlay {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
+}
+
+.json-quick-edit-dialog {
+    width: min(640px, 88%);
+    background: var(--purple-800);
+    border: 1px solid var(--color-border);
+    border-radius: 8px;
+    padding: 0.85rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.json-quick-edit-title {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--color-text-primary);
+}
+
+.json-quick-edit-grid {
+    display: grid;
+    grid-template-columns: 160px 1fr;
+    gap: 0.45rem 0.6rem;
+    align-items: center;
+}
+
+.json-quick-edit-grid label {
+    color: var(--color-text-secondary);
+    font-size: 0.82rem;
+}
+
+.json-quick-edit-grid input {
+    width: 100%;
+}
+
+.json-quick-edit-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}

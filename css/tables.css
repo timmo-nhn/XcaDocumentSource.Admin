@@ -1,0 +1,81 @@
+.loading-text {
+    color: var(--color-text-muted);
+    font-style: italic;
+    margin: 0;
+}
+
+.empty-text {
+    color: var(--color-text-label);
+    margin: 0;
+}
+
+.error-text {
+    color: var(--color-error);
+    margin: 0;
+}
+
+.pid-table {
+    margin-inline: 16px;
+    width: 100%;
+    border-collapse: collapse;
+    background: var(--color-bg-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    overflow: hidden;
+    font-size: 0.9rem;
+}
+
+.pid-table thead tr {
+    background: var(--color-bg-subtle);
+}
+
+.pid-table th {
+    text-align: left;
+    padding: 0.6rem 1rem;
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--color-text-secondary);
+    border-bottom: 1px solid var(--color-border);
+}
+
+.pid-table td {
+    padding: 0.55rem 1rem;
+    border-bottom: 1px solid var(--color-border-subtle);
+    color: var(--color-text-primary);
+    vertical-align: middle;
+}
+
+.pid-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.pid-table tbody tr:hover td {
+    background: var(--color-bg-elevated);
+}
+
+.pid-name {
+    font-weight: 600;
+}
+
+.pid-id code,
+.pid-system code {
+    font-family: ui-monospace, monospace;
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+    background: var(--color-bg-subtle);
+    padding: 0.1rem 0.35rem;
+    border-radius: 4px;
+}
+
+td td code[title="2.16.840.1.113883.5.25"] {
+    color: var(--purple-950);
+    background-color: var(--color-red);
+}
+
+td td code[title="2.16.578.1.12.4.1.1.9603"],
+td td code[title="http://terminology.hl7.org/CodeSystem/v3-Confidentiality"] {
+    color: var(--purple-950);
+    background-color: var(--color-green);
+}

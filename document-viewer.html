@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Viewer</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <script type="module" src="/js/documentViewerPage.js"></script>
+</head>
+<body class="viewer-page">
+    <div id="viewerTitle" class="viewer-toolbar">Document Viewer</div>
+    <div class="viewer-shell">
+        <div id="xmlPanel" class="viewer-xml-panel" hidden>
+            <label for="xmlRaw" class="viewer-xml-label">Document XML</label>
+            <textarea id="xmlRaw" class="viewer-xml-textarea" readonly></textarea>
+        </div>
+        <div id="viewerMessage" class="viewer-message" hidden></div>
+        <iframe id="viewerFrame" class="viewer-frame" title="Document Viewer"></iframe>
+    </div>
+</body>
+</html>

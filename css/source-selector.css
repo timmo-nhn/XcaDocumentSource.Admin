@@ -1,0 +1,84 @@
+.source-selector {
+    position: relative;
+    width: 450px;
+    flex: 0 0 auto;
+}
+
+.source-selector #sourceInput {
+    width: 100%;
+    padding-right: 2.3rem;
+}
+
+.source-selector__toggle {
+    position: absolute;
+    top: 50%;
+    right: 0.35rem;
+    transform: translateY(-50%);
+    width: 1.75rem;
+    height: 1.75rem;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: 5px;
+    background: var(--color-bg-elevated);
+    color: var(--color-text-secondary);
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
+.source-selector__toggle:hover {
+    background: var(--teal-800);
+    color: var(--teal-200);
+}
+
+.source-selector__menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    z-index: 1000;
+    margin: 0;
+    padding: 0.35rem 0;
+    list-style: none;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--color-bg-surface);
+    max-height: 260px;
+    overflow-y: auto;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.source-selector__item {
+    padding: 0.5rem 0.75rem;
+    color: var(--color-text-primary);
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.env-badge[data-environment="env-dev"] {
+    background-color: var(--color-dev-env);
+}
+
+.env-badge[data-environment="env-test"] {
+    background-color: var(--color-test-env);
+}
+
+.env-badge[data-environment="env-qa"] {
+    background-color: var(--color-qa-env);
+}
+
+.env-badge[data-environment="env-prod"] {
+    background-color: var(--color-prod-env);
+}
+
+.source-selector__item:hover {
+    background: var(--color-bg-elevated);
+}
+
+.env-badge{
+    opacity: 0.5;
+    display: inline-block;
+    width: 0.75rem;
+    height: 0.75rem;
+    border-radius: 50%;
+    margin-right: 0.5rem;
+}
