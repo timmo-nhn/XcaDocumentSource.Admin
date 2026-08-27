@@ -30,8 +30,8 @@ export async function deleteDocumentById(source, documentId) {
     await ensureOk(response, "Failed to delete document.");
 }
 
-export async function getDocumentEntryById(source, documentEntryId) {
-    const params = new URLSearchParams({ id: documentEntryId });
+export async function getDocumentEntryById(source, documentEntryId, includeDocument = false) {
+    const params = new URLSearchParams({ id: documentEntryId, includeDocument: includeDocument ? "true" : "false" });
     const response = await proxyFetch(`${source}/api/rest/document-entry?${params}`);
     await ensureOk(response, "Failed to load document entry.");
     return getResponseAsJson(response);
@@ -45,6 +45,17 @@ export async function patchDocumentEntryById(source, documentEntryId, payload) {
         contentType: "application/json"
     });
     await ensureOk(response, "Failed to update document reference.");
+}
+
+export async function uploadDocumentEntry(source, documentEntry) {
+    const response = await proxyFetch(`${source}/api/rest/document-entry`, {
+        method: "POST",
+        body: JSON.stringify(documentEntry),
+        contentType: "application/json"
+    });
+    await ensureOk(response, "Failed to upload document entry.");
+
+    return getResponseAsJson(response);
 }
 
 async function ensureOk(response, contextMessage) {

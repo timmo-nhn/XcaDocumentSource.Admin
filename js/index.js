@@ -1,6 +1,6 @@
 import { setApiKey, proxyFetch } from "./api.js";
-import { fetchHealthCheck, fetchAboutConfig, fetchRegistryObjects } from "./status.js";
-import { fetchPatientIdentifiers } from "./documents.js";
+import { fetchHealthCheck, fetchAboutConfig, fetchRegistryObjectsCount, fetchBackendImplementations } from "./status.js";
+import { fetchPatientIdentifiers, setupFetchDocumentEntryById } from "./documents.js";
 import { setupActionSection } from "./actions.js";
 import { escapeHtml } from "./utils.js";
 
@@ -23,7 +23,7 @@ setupInputDropdown();
 apiKeyInput.addEventListener("input", () => setApiKeyStatus(null));
 connectionStatus.textContent = "";
 
-submitButton.addEventListener("click", function () {
+submitButton.addEventListener("click", () => {
     const source = sourceInput.value.trim().replace(/\/$/, "");
     setApiKey(apiKeyInput.value.trim());
     if (source) runStatusChecks(source);
@@ -44,8 +44,10 @@ async function runStatusChecks(source) {
     await Promise.all([
         fetchHealthCheck(source),
         fetchAboutConfig(source),
-        fetchRegistryObjects(source),
+        fetchBackendImplementations(source),
+        fetchRegistryObjectsCount(source),
         fetchPatientIdentifiers(source),
+        setupFetchDocumentEntryById(source),
     ]);
 
     setupActionSection(source);
@@ -88,6 +90,8 @@ function setupInputDropdown() {
     const sourceOptions = [
         "https://localhost:7176",
         "https://viti-aktivt-sykehus.d-xcads.pjd.nhn.no",
+        "https://viti-stort-sykehus.d-xcads.pjd.nhn.no",
+        "https://viti-travelt-sykehus.d-xcads.pjd.nhn.no",
         "https://bjarne-sykehus.t-xcads.pjd.nhn.no",
         "https://kurt-sykehus.t-xcads.pjd.nhn.no",
         "https://rex-sykehus.t-xcads.pjd.nhn.no",

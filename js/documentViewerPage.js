@@ -1,4 +1,4 @@
-import { detectFileType, decodeUtf8 } from "./utils.js";
+import { detectFileType, decodeUtf8, extractNonXmlBodyData, decodeBase64, findElementByLocalName } from "./utils.js";
 
 const titleEl = document.getElementById("viewerTitle");
 const frameEl = document.getElementById("viewerFrame");
@@ -49,10 +49,10 @@ else {
             frameEl.src = documentUrl;
         }
         else {
-            const content = await response.arrayBuffer();
-            const payload = new Uint8Array(content);
-
+            const payload = new Uint8Array(await response.arrayBuffer());
+            
             const jsonWrapped = extractDocumentBytesFromJson(payload, responseContentType);
+            
             if (jsonWrapped) {
                 const xmlTextFromJson = extractClinicalDocumentXml(jsonWrapped.bytes);
                 if (xmlTextFromJson !== null) {
@@ -107,6 +107,7 @@ else {
 }
 
 function renderByType(detected, bytes) {
+    console.log(detected);
     switch (detected.kind) {
         case "pdf":
             renderPdf(bytes);
@@ -228,61 +229,27 @@ function extractClinicalDocumentXml(bytes) {
     return null;
 }
 
-function extractNonXmlBodyData(xmlText) {
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(xmlText, "application/xml");
-
-    const parseError = xml.querySelector("parsererror");
-    if (parseError) return null;
-
-    const nonXmlBody = findElementByLocalName(xml.documentElement, "NonXMLBody");
-    if (!nonXmlBody) return null;
-
-    const textElement = findElementByLocalName(nonXmlBody, "text");
-    if (!textElement) return null;
-
-    const mediaType = textElement.getAttribute("mediaType") || textElement.getAttribute("media-type");
-    const base64Data = (textElement.textContent || "").trim();
-    if (!base64Data) return null;
-
-    try {
-        return {
-            bytes: decodeBase64(base64Data),
-            mediaType,
-        };
-    } catch {
-        return null;
-    }
-}
-
-function findElementByLocalName(root, name) {
-    if (!root) return null;
-    const target = name.toLowerCase();
-    const all = [root, ...root.getElementsByTagName("*")];
-    for (const el of all) {
-        const local = (el.localName || el.nodeName || "").toLowerCase();
-        if (local === target) return el;
-    }
-    return null;
-}
-
 function extractDocumentBytesFromJson(bytes, mimeHint) {
     const hint = String(mimeHint || "").toLowerCase();
     const text = decodeUtf8(bytes).trim();
     if (!text) return null;
     if (!hint.includes("json") && !text.startsWith("{")) return null;
-
+    
+    let content;
     try {
         const payload = JSON.parse(text);
-        const base64 = payload?.document?.data ?? payload?.data;
-        if (!base64) return null;
+        content = payload?.document?.data ?? payload?.data;
+        if (!content) return null;
         const mimeType = payload?.document?.mimeType ?? payload?.document?.contentType ?? null;
         return {
-            bytes: decodeBase64(base64),
+            bytes: decodeBase64(content),
             mimeType,
         };
     } catch {
-        return null;
+        return {
+            bytes: content,
+            mimeType,
+        };
     }
 }
 
@@ -411,30 +378,6 @@ function rewriteCssDocumentCalls(xsltText, stylesheetPath) {
             }
         }
     );
-}
-
-function decodeBase64(input) {
-    let normalized = String(input).trim();
-    const marker = "base64,";
-    const markerIndex = normalized.indexOf(marker);
-
-    if (markerIndex >= 0) 
-        normalized = normalized.slice(markerIndex + marker.length);
-
-    normalized = normalized.replace(/\s/g, "").replace(/-/g, "+").replace(/_/g, "/");
-
-    const mod = normalized.length % 4;
-
-    if (mod > 0) 
-        normalized += "=".repeat(4 - mod);
-
-    const raw = atob(normalized);
-    const out = new Uint8Array(raw.length);
-
-    for (let i = 0; i < raw.length; i++) 
-        out[i] = raw.charCodeAt(i);
-
-    return out;
 }
 
 function escapeHtml(str) {

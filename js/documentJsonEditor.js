@@ -12,13 +12,13 @@ export function openDocumentJsonEditor({ title, initialPayload, onSave }) {
 
     const cleanup = () => {
         document.removeEventListener("keydown", onKeyDown);
-        elements.overlay.removeEventListener("click", onOverlayClick);
+        elements.overlay.removeEventListener("mousedown", onOverlayClick);
         elements.cancelButton.removeEventListener("click", onCancelClick);
         elements.saveButton.removeEventListener("click", onSaveClick);
         elements.quickButton.removeEventListener("click", onQuickClick);
         elements.quickCancelButton.removeEventListener("click", onQuickCancelClick);
         elements.quickApplyButton.removeEventListener("click", onQuickApplyClick);
-        elements.quickOverlay.removeEventListener("click", onQuickOverlayClick);
+        elements.quickOverlay.removeEventListener("mousedown", onQuickOverlayClick);
 
         elements.saveButton.disabled = false;
         elements.cancelButton.disabled = false;
@@ -141,13 +141,13 @@ export function openDocumentJsonEditor({ title, initialPayload, onSave }) {
     };
 
     document.addEventListener("keydown", onKeyDown);
-    elements.overlay.addEventListener("click", onOverlayClick);
+    elements.overlay.addEventListener("mousedown", onOverlayClick);
     elements.cancelButton.addEventListener("click", onCancelClick);
     elements.saveButton.addEventListener("click", onSaveClick);
     elements.quickButton.addEventListener("click", onQuickClick);
     elements.quickCancelButton.addEventListener("click", onQuickCancelClick);
     elements.quickApplyButton.addEventListener("click", onQuickApplyClick);
-    elements.quickOverlay.addEventListener("click", onQuickOverlayClick);
+    elements.quickOverlay.addEventListener("mousedown", onQuickOverlayClick);
 }
 
 function parseEditorPayload(rawText) {

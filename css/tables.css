@@ -69,6 +69,10 @@
     border-radius: 4px;
 }
 
+td small{
+    color: var(--purple-950);
+}
+
 td td code[title="2.16.840.1.113883.5.25"] {
     color: var(--purple-950);
     background-color: var(--color-red);
@@ -78,4 +82,50 @@ td td code[title="2.16.578.1.12.4.1.1.9603"],
 td td code[title="http://terminology.hl7.org/CodeSystem/v3-Confidentiality"] {
     color: var(--purple-950);
     background-color: var(--color-green);
+}
+
+/* Optional tighter table density for constrained layouts */
+table.compact-table {
+    font-size: 0.82rem;
+}
+
+table.compact-table th {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.64rem;
+}
+
+table.compact-table td {
+    padding: 0.24rem 0.48rem;
+}
+
+.doc-table.compact-table td code,
+.pid-table.compact-table td code {
+    font-size: 0.72rem;
+    padding: 0.08rem 0.24rem;
+}
+
+#patient-duplication-table {
+    position: fixed;
+    z-index: 10000;
+    top: 100px;
+    max-width: 90vw;
+}
+
+#patient-duplication-backdrop {
+    background: linear-gradient(180deg, blue 0%, black 100%);
+}
+
+#patient-duplication-backdrop p{
+    position: fixed;
+    top: -36px;
+    left: 4px;
+    font-size: 40px;
+    font-weight: 800;
+    font-family: serif;
+    text-shadow: 4px 6px black;
+}
+
+
+#patient-duplication-table tbody tr:hover td {
+    cursor: pointer;
 }

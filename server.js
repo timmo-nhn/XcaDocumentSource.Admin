@@ -133,7 +133,7 @@ const server = http.createServer(async (req, res) => {
             });
             
             proxyReq.on("error", (err) => {
-                console.log(err);
+                console.error(err);
                 res.writeHead(502, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ error: err.message }));
             });
@@ -164,82 +164,3 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, () => {
     console.log(`Admin server running at http://localhost:${PORT}`);
 });
-
-function extractEmbeddedDocument(rawBytes, upstreamContentType) {
-    const text = rawBytes.toString("utf8");
-
-    if (upstreamContentType.includes("json")) {
-        const payload = JSON.parse(text);
-        const base64 = payload?.document?.data ?? payload?.data;
-        if (!base64) return null;
-        return {
-            bytes: Buffer.from(normalizeBase64(base64), "base64"),
-            mediaType: payload?.document?.mimeType ?? payload?.document?.contentType ?? null,
-        };
-    }
-
-    if (upstreamContentType.includes("xml")) {
-        const trimmed = text.replace(/^\uFEFF?[\s\r\n\t]*/u, "");
-        if (!trimmed.startsWith("<ClinicalDocument")) return null;
-
-        const nonXmlBodyMatch = text.match(/<[^>]*NonXMLBody[^>]*>[\s\S]*?<[^>]*text\b([^>]*)>([\s\S]*?)<\/[^>]*text>[\s\S]*?<\/[^>]*NonXMLBody>/i);
-        if (!nonXmlBodyMatch) return null;
-
-        const textAttrs = nonXmlBodyMatch[1] ?? "";
-        const base64Data = (nonXmlBodyMatch[2] ?? "").trim();
-        if (!base64Data) return null;
-
-        const mediaTypeMatch = textAttrs.match(/\bmediaType\s*=\s*["']([^"']+)["']/i);
-        return {
-            bytes: Buffer.from(normalizeBase64(base64Data), "base64"),
-            mediaType: mediaTypeMatch ? mediaTypeMatch[1] : null,
-        };
-    }
-
-    return null;
-}
-
-function detectContentType(bytes, hint) {
-    if (hasPrefix(bytes, [0x25, 0x50, 0x44, 0x46])) return "application/pdf";
-    if (hasPrefix(bytes, [0x89, 0x50, 0x4e, 0x47])) return "image/png";
-    if (hasPrefix(bytes, [0xff, 0xd8, 0xff])) return "image/jpeg";
-    if (hasPrefix(bytes, [0x47, 0x49, 0x46, 0x38])) return "image/gif";
-    if (hasPrefix(bytes, [0x42, 0x4d])) return "image/bmp";
-    if (hasPrefix(bytes, [0x49, 0x49, 0x2a, 0x00]) || hasPrefix(bytes, [0x4d, 0x4d, 0x00, 0x2a])) return "image/tiff";
-    if (hasPrefix(bytes, [0x52, 0x49, 0x46, 0x46]) && hasAsciiAt(bytes, "WEBP", 8)) return "image/webp";
-    return hint || "application/octet-stream";
-}
-
-function hasPrefix(bytes, prefix) {
-    if (bytes.length < prefix.length) return false;
-    for (let i = 0; i < prefix.length; i++) {
-        if (bytes[i] !== prefix[i]) return false;
-    }
-    return true;
-}
-
-function hasAsciiAt(bytes, text, offset) {
-    if (bytes.length < offset + text.length) return false;
-    for (let i = 0; i < text.length; i++) {
-        if (bytes[offset + i] !== text.charCodeAt(i)) return false;
-    }
-    return true;
-}
-
-function normalizeBase64(value) {
-    let normalized = String(value).trim();
-    const marker = "base64,";
-    const markerIndex = normalized.indexOf(marker);
-    if (markerIndex >= 0) {
-        normalized = normalized.slice(markerIndex + marker.length);
-    }
-    normalized = normalized
-        .replace(/\s/g, "")
-        .replace(/-/g, "+")
-        .replace(/_/g, "/");
-    const mod = normalized.length % 4;
-    if (mod > 0) {
-        normalized += "=".repeat(4 - mod);
-    }
-    return normalized;
-}

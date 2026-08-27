@@ -1,39 +1,71 @@
 import { setUploadDocumentField } from "./actions.js";
 import * as viewer from "./documentViewer.js";
-import { escapeHtml, formatSize } from "./utils.js";
+import { escapeHtml, formatSize, setNewIdentifiersForDocumentEntry, extractNonXmlBodyData } from "./utils.js";
+import { openDocumentJsonEditor } from "./documentJsonEditor.js";
+import { clonePatientTableFromDOMAsPatientDuplicationForm, onDocumentEntryDuplicatePatientClicked } from "./documentDuplication.js";
 import {
     deleteAllDataForPatient,
     deleteDocumentById,
     getDocumentEntryById,
     listDocumentEntries,
     listPatients,
-    patchDocumentEntryById
+    patchDocumentEntryById,
 } from "./documentsApi.js";
-import { openDocumentJsonEditor } from "./documentJsonEditor.js";
 
-const COL_SPAN = 6;
-const LOADING_ICON_HTML = `<img src="/loading.gif" alt="Loading" width="14" height="14">`;
+const LOADING_ICON_HTML = `<img src="/loading.gif" alt="Loading" width="16" height="16">`;
 
-export async function fetchPatientIdentifiers(source) {
-    const container = document.getElementById("patient-identifiers");
+export async function fetchPatientIdentifiers(source, containerInput) {
+    const container = containerInput || document.getElementById("patient-identifiers");
     const patientHeader = container.parentElement.querySelector("h2");
     patientHeader.textContent = "Patients";
     container.innerHTML = `<p class="loading-text">Loading…</p>`;
 
     try {
         const entries = await listPatients(source);
+
         if (entries.length === 0) {
             container.innerHTML = `<p class="empty-text">No patients found.</p>`;
             return;
         }
 
-        const genderLabel = (g) => g === "M" ? "♂ Male" : g === "F" ? "♀ Female" : g ?? "—";
-        const formatDate = (d) => d
-            ? new Date(d).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric" })
-            : "—";
+        renderPatientsTable(container, entries);
 
-        patientHeader.textContent = `Patients (${entries.length})`;
-        container.innerHTML = `
+        const dataRows = [...container.querySelectorAll("tbody tr[data-patient-id]")];
+        dataRows.forEach((row) => bindPatientRow(row, source));
+    } catch (err) {
+        container.innerHTML = `<p class="error-text">${escapeHtml(err.message)}</p>`;
+    }
+}
+
+export async function setupFetchDocumentEntryById(source) {
+    const button = document.getElementById("fetchDocumentEntryButton");
+    const input = document.getElementById("documentEntryIdInput");
+
+    button.addEventListener("click", async () => {
+        const documentEntryId = input.value.trim();
+        if (!documentEntryId) {
+            alert("Please enter a DocumentEntry ID.");
+            return;
+        }
+
+        await handleEditDocumentReference(button, source, documentEntryId);
+    });
+
+    input.addEventListener("keydown", async (event) => {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            button.click();
+        }
+    });
+}
+
+function renderPatientsTable(patientTableContainer, entries) {
+    console.log(entries);
+    const sortedEntries = [...entries?.sort((a, b) => a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName))];
+    const renderedPatientRows = sortedEntries.map((entry, index) => renderPatientRow(entry, index)).join("");
+
+    setPatientHeaderCount(patientTableContainer, entries.length);
+    const tableHtml = `
             <table class="pid-table">
                 <thead>
                     <tr>
@@ -46,27 +78,36 @@ export async function fetchPatientIdentifiers(source) {
                     </tr>
                 </thead>
                 <tbody>
-                    ${entries.sort((a, b) => a.firstName.localeCompare(b.firstName)).map((entry, index) => renderPatientRow(entry, formatDate, genderLabel, index)).join("")}
+                    ${renderedPatientRows}
                 </tbody>
             </table>`;
-
-        const dataRows = [...container.querySelectorAll("tbody tr[data-patient-id]")];
-        dataRows.forEach((row) => bindPatientRow(row, source));
-    } catch (err) {
-        container.innerHTML = `<p class="error-text">${escapeHtml(err.message)}</p>`;
-    }
+    patientTableContainer.innerHTML = tableHtml;
 }
 
-function renderPatientRow(entry, formatDate, genderLabel, index) {
+function setPatientHeaderCount(patientTableContainer, count) {
+    const patientHeader = patientTableContainer.parentElement?.querySelector("h2");
+    if (!patientHeader) return;
+
+    patientHeader.textContent = `Patients (${count})`;
+}
+
+function renderPatientRow(entry, index) {
     const patientId = escapeHtml(entry?.patientId?.id ?? "—");
     const patientSystem = escapeHtml(entry?.patientId?.system ?? "—");
     const patientName = escapeHtml([entry?.firstName, entry?.lastName].filter(Boolean).join(" ") || "—");
-    const dateOfBirth = escapeHtml(formatDate(entry?.birthTime));
-    const gender = escapeHtml(genderLabel(entry?.gender));
+    const dateOfBirth = escapeHtml(entry?.birthTime ? new Date(entry.birthTime).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric" }) : "—");
+    const gender = escapeHtml(entry?.gender === "M" ? "♂ Male" : entry?.gender === "F" ? "♀ Female" : entry?.gender ?? "—");
     const expandId = `expand-${index}`;
 
     return `
-        <tr data-patient-id="${patientId}" data-patient-id-system="${patientSystem}">
+        <tr data-patient-id="${patientId}" 
+            data-patient-id-system="${patientSystem}" 
+            data-patient-name="${patientName}" 
+            data-patient-first-name="${escapeHtml(entry?.firstName ?? "")}" 
+            data-patient-last-name="${escapeHtml(entry?.lastName ?? "")}" 
+            data-patient-birthtime="${escapeHtml(entry?.birthTime ?? "")}" 
+            data-patient-gender="${escapeHtml(entry?.gender ?? "")}">
+
             <td class="pid-name">${patientName}</td>
             <td class="pid-id"><code>${patientId}</code></td>
             <td class="pid-system"><code>${patientSystem}</code></td>
@@ -75,7 +116,7 @@ function renderPatientRow(entry, formatDate, genderLabel, index) {
             <td class="pid-actions"></td>
         </tr>
         <tr id="${expandId}" class="doc-expand-row">
-            <td colspan="${COL_SPAN}">
+            <td colspan="6">
                 <div class="doc-list-content"></div>
             </td>
         </tr>`;
@@ -84,8 +125,10 @@ function renderPatientRow(entry, formatDate, genderLabel, index) {
 function bindPatientRow(row, source) {
     addUploadDocumentButton(row);
     addDeleteAllDataButton(row, source);
+    // addFindPatientInSyntpopButton(row);
     addDocumentListToggle(row, source);
 }
+
 
 function addUploadDocumentButton(row) {
     if (row.dataset.uploadAttached === "true") return;
@@ -139,6 +182,33 @@ function addDeleteAllDataButton(row, source) {
     row.querySelector("td.pid-actions").append(button);
 }
 
+function addFindPatientInSyntpopButton(row) {
+    if (row.dataset.syntpopAttached === "true") return;
+    row.dataset.syntpopAttached = "true";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn-action-doc";
+    button.textContent = "🤖";
+    button.title = "Find patient in SyntPop";
+
+    button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+
+        const name = row.dataset.patientName;
+        if (!name) {
+            throw new Error("Missing patient name.");
+        }
+
+        setButtonLoading(button);
+        let response = await synpopClient.getByName(name);
+
+        restoreButton(button, "🤖");
+    });
+
+    row.querySelector("td.pid-actions").append(button);
+}
+
 function addDocumentListToggle(row, source) {
     if (row.dataset.attached === "true") return;
     row.dataset.attached = "true";
@@ -165,13 +235,15 @@ async function loadDocumentList(source, patientId, expandRow) {
     content.innerHTML = `<p class="loading-text">Loading documents…</p>`;
 
     try {
-        const documents = await listDocumentEntries(source, patientId);
-        if (documents.length === 0) {
+        const documentList = await listDocumentEntries(source, patientId);
+        if (documentList.length === 0) {
             content.innerHTML = `<p class="empty-text">No documents found.</p>`;
             return;
         }
 
-        content.innerHTML = renderDocumentTable(documents);
+        const sortedDocumentList = [...documentList?.sort((a, b) => a.documentReference?.title.localeCompare(b.documentReference?.title) || a.documentReference?.creationTime.localeCompare(b.documentReference?.creationTime))];
+
+        content.innerHTML = renderDocumentTable(sortedDocumentList);
         wireDocumentTableInteractions(content, source, patientId, expandRow);
     } catch (err) {
         content.innerHTML = `<p class="error-text">${escapeHtml(err.message)}</p>`;
@@ -182,7 +254,8 @@ function renderDocumentTable(documents) {
     const rows = documents.map((docRef) => {
         const reference = docRef.documentReference ?? {};
         const entryId = reference.id ?? "";
-        const documentId = reference.uniqueId ?? reference.id ?? "";
+        const documentId = reference.uniqueId;
+        const documentReferenceId = reference.id;
         const titleRaw = reference.title ?? reference.name ?? "—";
         const created = reference.creationTime ?? reference.created ?? reference.date;
 
@@ -194,19 +267,34 @@ function renderDocumentTable(documents) {
         const editButton = entryId
             ? `<button type="button" class="btn-action-doc btn-edit-document-reference" data-entry-id="${encodeURIComponent(entryId)}" title="Edit document reference JSON">✏️</button>`
             : "—";
+
+        const duplicateDocumentReference = entryId
+            ? `<button type="button" class="btn-action-doc btn-duplicate-document-reference" data-entry-id="${encodeURIComponent(entryId)}" title="Duplicate document reference to another patient">📋</button>`
+            : "—";
+
         const deleteButton = documentId
             ? `<button type="button" class="btn-action-doc btn-delete-document" data-doc-id="${encodeURIComponent(documentId)}" title="Delete this document">🛑</button>`
+            : "—";
+
+        const storeLocallyButton = documentId
+            ? `<button type="button" class="btn-action-doc btn-store-locally" data-entry-id="${encodeURIComponent(entryId)}" title="Save as .json (Shift+Click to save only document content)">💾</button>`
             : "—";
 
         return `
             <tr${rowClass}${rowAttrs}>
                 <td>${escapeHtml(titleRaw)}</td>
                 <td>${renderConfidentiality(reference?.confidentialityCode ?? [])}</td>
+                <td>${renderAuthorInstitution(reference?.author)}</td>
                 <td>${reference?.size == null ? "—" : formatSize(Number(reference.size))}</td>
-                <td><code>${escapeHtml(documentId || "—")}</code></td>
+                <td><small><code title="Document Entry Id">${escapeHtml(documentReferenceId || "—")}</code><br><code title="Document UniqueId">${escapeHtml(documentId || "—")}</code></small></td>
                 <td>${created ? new Date(created).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
                 <td>${escapeHtml(reference?.mimeType ?? reference?.contentType ?? "Unknown")}</td>
-                <td>${editButton} ${deleteButton}</td>
+                <td class="action-column">
+                    ${editButton} 
+                    ${duplicateDocumentReference}
+                    ${storeLocallyButton}
+                    ${deleteButton}
+                </td>
             </tr>`;
     }).join("");
 
@@ -216,14 +304,44 @@ function renderDocumentTable(documents) {
                 <tr>
                     <th>Title</th>
                     <th>Confidentiality</th>
+                    <th>Institutions</th>
                     <th>Size</th>
-                    <th>Document ID</th>
+                    <th>Document Identifiers</th>
                     <th>Created</th>
                     <th>MIME Type</th>
                     <th>Actions</th>
                 </tr>
             </thead>
             <tbody>${rows}</tbody>
+        </table>`;
+}
+
+function renderAuthorInstitution(authors) {
+    if (!authors) return "—";
+
+    const authorList = [...authors].map(author => {
+        const organization = author?.organization;
+        const department = author?.department;
+
+        const orgName = organization?.organizationName ?? "";
+        const deptName = department?.organizationName ?? "";
+
+        const organizationTitle = organization.id && organization.assigningAuthority ? `Code: ${organization.id}\nSystem: ${organization.assigningAuthority}` : "";
+        const departmentTitle = department.id && organization.assigningAuthority ? `Code: ${department.id}\nSystem: ${organization.assigningAuthority}` : "";
+
+        const organizationString = orgName ? `<code title="${organizationTitle}">${escapeHtml(orgName)}</code>` : "";
+        const departmentString = deptName ? `<code title="${departmentTitle}">${escapeHtml(deptName)}</code>` : "";
+
+        return `
+        <tr>
+            <td>${organizationString}</td>
+            <td>${departmentString}</td>
+        </tr>`;
+    }).join("");
+
+    return `
+        <table class="doc-table compact-table">
+            <tbody>${authorList}</tbody>
         </table>`;
 }
 
@@ -240,29 +358,35 @@ function wireDocumentTableInteractions(content, source, patientId, expandRow) {
 
     tableBody.addEventListener("click", async (event) => {
         const actionButton = event.target.closest("button");
-        if (actionButton) {
+        const anyActionButtonClicked = !!actionButton;
+
+        if (anyActionButtonClicked) {
             event.stopPropagation();
 
             if (actionButton.classList.contains("btn-delete-document")) {
                 await handleDeleteDocument(actionButton, source, patientId, expandRow);
             } else if (actionButton.classList.contains("btn-edit-document-reference")) {
                 await handleEditDocumentReference(actionButton, source, patientId, expandRow);
+            } else if (actionButton.classList.contains("btn-duplicate-document-reference")) {
+                await handleDuplicateDocumentReference(actionButton, source, patientId, expandRow);
+            } else if (actionButton.classList.contains("btn-store-locally")) {
+                await handleStoreDocumentLocally(event, actionButton, source, patientId, expandRow);
             }
-            return;
         }
+        else {
+            const row = event.target.closest("tr.doc-row-link");
+            if (!row) return;
 
-        const row = event.target.closest("tr.doc-row-link");
-        if (!row) return;
+            const link = row.dataset.link ? decodeURIComponent(row.dataset.link) : "";
+            if (!link) return;
 
-        const link = row.dataset.link ? decodeURIComponent(row.dataset.link) : "";
-        if (!link) return;
-
-        viewer.openDocumentViewer({
-            source,
-            link,
-            title: row.dataset.title ? decodeURIComponent(row.dataset.title) : "Document",
-            mimeType: row.dataset.mime ? decodeURIComponent(row.dataset.mime) : "Unknown"
-        });
+            viewer.openDocumentViewer({
+                source,
+                link,
+                title: row.dataset.title ? decodeURIComponent(row.dataset.title) : "Document",
+                mimeType: row.dataset.mime ? decodeURIComponent(row.dataset.mime) : "Unknown"
+            });
+        }
     });
 }
 
@@ -285,8 +409,8 @@ async function handleDeleteDocument(button, source, patientId, expandRow) {
     }
 }
 
-async function handleEditDocumentReference(button, source, patientId, expandRow) {
-    const documentEntryId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : "";
+async function handleEditDocumentReference(button, source, patientIdOrUniqueId, expandRow) {
+    const documentEntryId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : patientIdOrUniqueId;
     if (!documentEntryId) {
         throw new Error("Missing document entry id.");
     }
@@ -294,7 +418,7 @@ async function handleEditDocumentReference(button, source, patientId, expandRow)
     setButtonLoading(button);
     let payload;
     try {
-        payload = await getDocumentEntryById(source, documentEntryId);
+        payload = await getDocumentEntryById(source, documentEntryId, false);
     } catch (err) {
         alert(`Failed to load document entry.\n\n${err.message}`);
         restoreButton(button, "✏️");
@@ -309,10 +433,69 @@ async function handleEditDocumentReference(button, source, patientId, expandRow)
         initialPayload: payload,
         onSave: async (editedPayload) => {
             await patchDocumentEntryById(source, documentEntryId, editedPayload);
-            await loadDocumentList(source, patientId, expandRow);
+            if (expandRow) {
+                await loadDocumentList(source, patientIdOrUniqueId, expandRow);
+            }
+            else {
+                await fetchPatientIdentifiers(source);
+            }
         }
     });
 }
+
+async function handleDuplicateDocumentReference(button, source, patientId, expandRow) {
+    const documentId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : "";
+
+    const recycledTable = clonePatientTableFromDOMAsPatientDuplicationForm();
+
+    // Backdrop blocks scroll and pointer events on the background
+    const backdrop = document.createElement("div");
+    const textNode = document.createElement("p");
+    textNode.textContent = `Select target patient for document: ${documentId}`;
+    backdrop.appendChild(textNode);
+
+    backdrop.id = "patient-duplication-backdrop";
+    backdrop.style.cssText = "position:fixed;inset:0;z-index:999;";
+    backdrop.appendChild(recycledTable);
+    document.body.appendChild(backdrop);
+    document.body.style.overflow = "hidden";
+
+    backdrop._duplicateClickHandler = (event) =>
+        onDocumentEntryDuplicatePatientClicked(event, source, documentId, backdrop);
+    backdrop.addEventListener("click", backdrop._duplicateClickHandler);
+}
+
+async function handleStoreDocumentLocally(event, button, source, patientId, expandRow) {
+    setButtonLoading(button);
+    const documentEntryId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : "";
+    const documentEntry = await getDocumentEntryById(source, documentEntryId, true);
+    
+    setNewIdentifiersForDocumentEntry(documentEntry);
+
+    let downloadLink = document.createElement("a");
+    const fileName = `${documentEntry.documentEntry?.id}-${documentEntry.documentEntry?.title}`;
+    
+    if (event.shiftKey) {
+        const data = atob(documentEntry.document?.data);
+        const documentData = await extractNonXmlBodyData(data);
+        downloadLink.href = URL.createObjectURL(new Blob([documentData?.bytes || documentEntry.document?.data || new Uint8Array()], { type: documentEntry.documentEntry?.mimeType || "application/octet-stream" }));
+        downloadLink.download = fileName;
+    }
+    else {
+        const jsonString = JSON.stringify(documentEntry, null, 2);
+        downloadLink.href = URL.createObjectURL(new Blob([jsonString], { type: "application/json" }));
+        downloadLink.download = `${fileName}.json`;
+    }
+
+    downloadLink.style.display = "none";
+    document.body.appendChild(downloadLink);
+    
+    downloadLink.click();
+
+    document.body.removeChild(downloadLink);
+    restoreButton(button);
+}
+
 
 function removeLargeDocumentContent(payload) {
     if (payload?.documentReference && typeof payload.documentReference === "object") {
