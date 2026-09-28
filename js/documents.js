@@ -10,7 +10,7 @@ import {
     patchDocumentEntryById
 } from "./documentsApi.js";
 import { openDocumentJsonEditor } from "./documentJsonEditor.js";
-
+import * as documentDuplication from "./documentDuplication.js";
 
 const LOADING_ICON_HTML = `<img src="/loading.gif" alt="Loading" width="16" height="16">`;
 
@@ -93,14 +93,15 @@ function setPatientHeaderCount(patientTableContainer, count) {
 function renderPatientRow(entry, index) {
     const patientId = escapeHtml(entry?.patientId?.id ?? "—");
     const patientSystem = escapeHtml(entry?.patientId?.system ?? "—");
-    const patientName = escapeHtml([entry?.firstName, entry?.lastName].filter(Boolean).join(" ") || "—");
+    const patientFirstName = escapeHtml(entry?.firstName);
+    const patientLastName = escapeHtml(entry?.lastName);
     const dateOfBirth = escapeHtml(entry?.birthTime ? new Date(entry.birthTime).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric" }) : "—");
     const gender = escapeHtml(entry?.gender === "M" ? "♂ Male" : entry?.gender === "F" ? "♀ Female" : entry?.gender ?? "—");
     const expandId = `expand-${index}`;
 
     return `
-        <tr data-patient-id="${patientId}" data-patient-id-system="${patientSystem}" data-patient-name="${patientName}">
-            <td class="pid-name">${patientName}</td>
+        <tr data-patient-id="${entry?.patientId?.id}" data-patient-id-system="${entry?.patientId?.system}" data-patient-first-name="${entry?.firstName}" data-patient-last-name="${entry?.lastName}" data-patient-birthtime="${entry?.birthTime}" data-patient-gender="${entry?.gender}">
+            <td class="pid-name">${patientFirstName} ${patientLastName}</td>
             <td class="pid-id"><code>${patientId}</code></td>
             <td class="pid-system"><code>${patientSystem}</code></td>
             <td>${dateOfBirth}</td>
@@ -266,6 +267,10 @@ function renderDocumentTable(documents) {
             ? `<button type="button" class="btn-action-doc btn-delete-document" data-doc-id="${encodeURIComponent(documentId)}" title="Delete this document">🛑</button>`
             : "—";
 
+        const saveButton = documentId
+            ? `<button type="button" class="btn-action-doc btn-save-document" data-doc-id="${encodeURIComponent(documentId)}" title="Save this document">💾</button>`
+            : "—";
+
         return `
             <tr${rowClass}${rowAttrs}>
                 <td>${escapeHtml(titleRaw)}</td>
@@ -275,7 +280,7 @@ function renderDocumentTable(documents) {
                 <td><small><code title="Document Entry Id">${escapeHtml(documentReferenceId || "—")}</code><br><code title="Document UniqueId">${escapeHtml(documentId || "—")}</code></small></td>
                 <td>${created ? new Date(created).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
                 <td>${escapeHtml(reference?.mimeType ?? reference?.contentType ?? "Unknown")}</td>
-                <td class="action-column">${editButton} ${duplicateDocumentReference} ${deleteButton}</td>
+                <td class="action-column">${editButton} ${duplicateDocumentReference} ${deleteButton} ${saveButton}</td>
             </tr>`;
     }).join("");
 
@@ -350,6 +355,8 @@ function wireDocumentTableInteractions(content, source, patientId, expandRow) {
                 await handleEditDocumentReference(actionButton, source, patientId, expandRow);
             } else if (actionButton.classList.contains("btn-duplicate-document-reference")) {
                 await handleDuplicateDocumentReference(actionButton, source, patientId, expandRow);
+            } else if (actionButton.classList.contains("btn-save-document")) {
+                await handleSaveDocument(actionButton, source, patientId, expandRow);
             }
         }
         else {
@@ -425,46 +432,13 @@ async function handleEditDocumentReference(button, source, patientIdOrUniqueId, 
 async function handleDuplicateDocumentReference(button, source, patientId, expandRow) {
     const documentId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : "";
 
-    const recycledTable = clonePatientTableFromDOMAsPatientDuplicationForm();
+    const recycledTable = documentDuplication.clonePatientTableFromDOMAsPatientDuplicationForm();
     document.body.appendChild(recycledTable);
+    document.body.style.overflow = "hidden";
 
-    document.body.addEventListener("click", (event) => onDocumentEntryDuplicatePatientClicked(event, recycledTable));
-
-    const documentEntryToDuplicate = await getDocumentEntryById(source, documentId);
-    console.log("Document entry to duplicate:", documentEntryToDuplicate);
-
+    document.body.addEventListener("click", (event) => documentDuplication.onDocumentEntryDuplicatePatientClicked(event, source, documentId, recycledTable));
 }
 
-async function onDocumentEntryDuplicatePatientClicked(event, recycledTable) {
-    const selectedRow = event.target.closest("#patient-duplication-table tbody tr[data-patient-id]");
-    if (!selectedRow) {
-        cleanupHandleDuplicateDocumentReference(recycledTable);
-        return;
-    }
-    console.log("Selected patient row for duplication:", selectedRow);
-
-}
-
-function cleanupHandleDuplicateDocumentReference(recycledTable) {
-    console.log("Removing recycled patient duplication table from DOM.");
-    document.body.removeEventListener("click", onDocumentEntryDuplicatePatientClicked);
-    document.body.removeChild(recycledTable);
-}
-
-function clonePatientTableFromDOMAsPatientDuplicationForm() {
-    const existingTable = document.querySelector("#patient-identifiers table");
-    if (!existingTable) return null;
-
-    const newTable = existingTable.cloneNode(true);
-    newTable.id = "patient-duplication-table";
-
-    // Remove the last header row and any existing expand rows or action columns or styling
-    newTable.querySelectorAll("tbody tr").forEach(row => row.classList.remove("btn-docs--active"));
-    newTable.querySelectorAll(".doc-expand-row").forEach(node => node.remove());
-    newTable.querySelectorAll("td.pid-actions").forEach(node => node.remove());
-
-    return newTable;
-}
 
 function removeLargeDocumentContent(payload) {
     if (payload?.documentReference && typeof payload.documentReference === "object") {

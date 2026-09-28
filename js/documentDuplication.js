@@ -1,8 +1,12 @@
-import {getDocumentEntryById, uploadDocumentEntry} from "./documentsApi.js";
+import { getDocumentEntryById, uploadDocumentEntry } from "./documentsApi.js";
 import { fetchPatientIdentifiers } from "./documents.js";
 import { setNewIdentifiersForDocumentEntry } from "./utils.js";
 
 export async function onDocumentEntryDuplicatePatientClicked(event, source, documentId, backdrop) {
+    if (document.body.contains(backdrop)) {
+        document.body.removeChild(backdrop);
+    }
+
     const selectedRow = event.target.closest("#patient-duplication-table tbody tr[data-patient-id]");
     if (!selectedRow) {
         cleanupHandleDuplicateDocumentReference(backdrop);
@@ -34,8 +38,12 @@ export async function onDocumentEntryDuplicatePatientClicked(event, source, docu
 }
 
 function cleanupHandleDuplicateDocumentReference(backdrop) {
-    backdrop.removeEventListener("click", backdrop._duplicateClickHandler);
-    document.body.removeChild(backdrop);
+    if (backdrop._duplicateClickHandler) {
+        backdrop.removeEventListener("click", backdrop._duplicateClickHandler);
+    }
+    if (document.body.contains(backdrop)) {
+        document.body.removeChild(backdrop);
+    }
     document.body.style.overflow = "";
 }
 
@@ -45,6 +53,7 @@ export function clonePatientTableFromDOMAsPatientDuplicationForm() {
 
     const newTable = existingTable.cloneNode(true);
     newTable.id = "patient-duplication-table";
+    newTable.style.background = "var(--color-bg-surface)";
 
     // Remove the last header row and any existing expand rows or action columns or styling
     newTable.querySelectorAll("tbody tr").forEach(row => row.classList.remove("btn-docs--active"));

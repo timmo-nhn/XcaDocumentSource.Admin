@@ -109,6 +109,8 @@ table.compact-table td {
     z-index: 10000;
     top: 100px;
     max-width: 90vw;
+    background: var(--color-bg-surface);
+    box-shadow: 0 0 0 100vmax rgba(128, 128, 128, 0.75);
 }
 
 #patient-duplication-backdrop {
