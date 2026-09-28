@@ -133,7 +133,7 @@ const server = http.createServer(async (req, res) => {
             });
             
             proxyReq.on("error", (err) => {
-                console.error(err);
+                console.log(err);
                 res.writeHead(502, { "Content-Type": "application/json" });
                 res.end(JSON.stringify({ error: err.message }));
             });

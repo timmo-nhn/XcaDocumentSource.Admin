@@ -1,16 +1,16 @@
 import { setUploadDocumentField } from "./actions.js";
 import * as viewer from "./documentViewer.js";
-import { escapeHtml, formatSize, setNewIdentifiersForDocumentEntry, extractNonXmlBodyData } from "./utils.js";
-import { openDocumentJsonEditor } from "./documentJsonEditor.js";
-import { clonePatientTableFromDOMAsPatientDuplicationForm, onDocumentEntryDuplicatePatientClicked } from "./documentDuplication.js";
+import { escapeHtml, formatSize } from "./utils.js";
 import {
     deleteAllDataForPatient,
     deleteDocumentById,
     getDocumentEntryById,
     listDocumentEntries,
     listPatients,
-    patchDocumentEntryById,
+    patchDocumentEntryById
 } from "./documentsApi.js";
+import { openDocumentJsonEditor } from "./documentJsonEditor.js";
+
 
 const LOADING_ICON_HTML = `<img src="/loading.gif" alt="Loading" width="16" height="16">`;
 
@@ -60,8 +60,7 @@ export async function setupFetchDocumentEntryById(source) {
 }
 
 function renderPatientsTable(patientTableContainer, entries) {
-    console.log(entries);
-    const sortedEntries = [...entries?.sort((a, b) => a.firstName.localeCompare(b.firstName) || a.lastName.localeCompare(b.lastName))];
+    const sortedEntries = [...entries];
     const renderedPatientRows = sortedEntries.map((entry, index) => renderPatientRow(entry, index)).join("");
 
     setPatientHeaderCount(patientTableContainer, entries.length);
@@ -100,14 +99,7 @@ function renderPatientRow(entry, index) {
     const expandId = `expand-${index}`;
 
     return `
-        <tr data-patient-id="${patientId}" 
-            data-patient-id-system="${patientSystem}" 
-            data-patient-name="${patientName}" 
-            data-patient-first-name="${escapeHtml(entry?.firstName ?? "")}" 
-            data-patient-last-name="${escapeHtml(entry?.lastName ?? "")}" 
-            data-patient-birthtime="${escapeHtml(entry?.birthTime ?? "")}" 
-            data-patient-gender="${escapeHtml(entry?.gender ?? "")}">
-
+        <tr data-patient-id="${patientId}" data-patient-id-system="${patientSystem}" data-patient-name="${patientName}">
             <td class="pid-name">${patientName}</td>
             <td class="pid-id"><code>${patientId}</code></td>
             <td class="pid-system"><code>${patientSystem}</code></td>
@@ -235,15 +227,13 @@ async function loadDocumentList(source, patientId, expandRow) {
     content.innerHTML = `<p class="loading-text">Loading documents…</p>`;
 
     try {
-        const documentList = await listDocumentEntries(source, patientId);
-        if (documentList.length === 0) {
+        const documents = await listDocumentEntries(source, patientId);
+        if (documents.length === 0) {
             content.innerHTML = `<p class="empty-text">No documents found.</p>`;
             return;
         }
 
-        const sortedDocumentList = [...documentList?.sort((a, b) => a.documentReference?.title.localeCompare(b.documentReference?.title) || a.documentReference?.creationTime.localeCompare(b.documentReference?.creationTime))];
-
-        content.innerHTML = renderDocumentTable(sortedDocumentList);
+        content.innerHTML = renderDocumentTable(documents);
         wireDocumentTableInteractions(content, source, patientId, expandRow);
     } catch (err) {
         content.innerHTML = `<p class="error-text">${escapeHtml(err.message)}</p>`;
@@ -276,10 +266,6 @@ function renderDocumentTable(documents) {
             ? `<button type="button" class="btn-action-doc btn-delete-document" data-doc-id="${encodeURIComponent(documentId)}" title="Delete this document">🛑</button>`
             : "—";
 
-        const storeLocallyButton = documentId
-            ? `<button type="button" class="btn-action-doc btn-store-locally" data-entry-id="${encodeURIComponent(entryId)}" title="Save as .json (Shift+Click to save only document content)">💾</button>`
-            : "—";
-
         return `
             <tr${rowClass}${rowAttrs}>
                 <td>${escapeHtml(titleRaw)}</td>
@@ -289,12 +275,7 @@ function renderDocumentTable(documents) {
                 <td><small><code title="Document Entry Id">${escapeHtml(documentReferenceId || "—")}</code><br><code title="Document UniqueId">${escapeHtml(documentId || "—")}</code></small></td>
                 <td>${created ? new Date(created).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
                 <td>${escapeHtml(reference?.mimeType ?? reference?.contentType ?? "Unknown")}</td>
-                <td class="action-column">
-                    ${editButton} 
-                    ${duplicateDocumentReference}
-                    ${storeLocallyButton}
-                    ${deleteButton}
-                </td>
+                <td class="action-column">${editButton} ${duplicateDocumentReference} ${deleteButton}</td>
             </tr>`;
     }).join("");
 
@@ -369,8 +350,6 @@ function wireDocumentTableInteractions(content, source, patientId, expandRow) {
                 await handleEditDocumentReference(actionButton, source, patientId, expandRow);
             } else if (actionButton.classList.contains("btn-duplicate-document-reference")) {
                 await handleDuplicateDocumentReference(actionButton, source, patientId, expandRow);
-            } else if (actionButton.classList.contains("btn-store-locally")) {
-                await handleStoreDocumentLocally(event, actionButton, source, patientId, expandRow);
             }
         }
         else {
@@ -418,7 +397,7 @@ async function handleEditDocumentReference(button, source, patientIdOrUniqueId, 
     setButtonLoading(button);
     let payload;
     try {
-        payload = await getDocumentEntryById(source, documentEntryId, false);
+        payload = await getDocumentEntryById(source, documentEntryId);
     } catch (err) {
         alert(`Failed to load document entry.\n\n${err.message}`);
         restoreButton(button, "✏️");
@@ -447,55 +426,45 @@ async function handleDuplicateDocumentReference(button, source, patientId, expan
     const documentId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : "";
 
     const recycledTable = clonePatientTableFromDOMAsPatientDuplicationForm();
+    document.body.appendChild(recycledTable);
 
-    // Backdrop blocks scroll and pointer events on the background
-    const backdrop = document.createElement("div");
-    const textNode = document.createElement("p");
-    textNode.textContent = `Select target patient for document: ${documentId}`;
-    backdrop.appendChild(textNode);
+    document.body.addEventListener("click", (event) => onDocumentEntryDuplicatePatientClicked(event, recycledTable));
 
-    backdrop.id = "patient-duplication-backdrop";
-    backdrop.style.cssText = "position:fixed;inset:0;z-index:999;";
-    backdrop.appendChild(recycledTable);
-    document.body.appendChild(backdrop);
-    document.body.style.overflow = "hidden";
+    const documentEntryToDuplicate = await getDocumentEntryById(source, documentId);
+    console.log("Document entry to duplicate:", documentEntryToDuplicate);
 
-    backdrop._duplicateClickHandler = (event) =>
-        onDocumentEntryDuplicatePatientClicked(event, source, documentId, backdrop);
-    backdrop.addEventListener("click", backdrop._duplicateClickHandler);
 }
 
-async function handleStoreDocumentLocally(event, button, source, patientId, expandRow) {
-    setButtonLoading(button);
-    const documentEntryId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : "";
-    const documentEntry = await getDocumentEntryById(source, documentEntryId, true);
-    
-    setNewIdentifiersForDocumentEntry(documentEntry);
-
-    let downloadLink = document.createElement("a");
-    const fileName = `${documentEntry.documentEntry?.id}-${documentEntry.documentEntry?.title}`;
-    
-    if (event.shiftKey) {
-        const data = atob(documentEntry.document?.data);
-        const documentData = await extractNonXmlBodyData(data);
-        downloadLink.href = URL.createObjectURL(new Blob([documentData?.bytes || documentEntry.document?.data || new Uint8Array()], { type: documentEntry.documentEntry?.mimeType || "application/octet-stream" }));
-        downloadLink.download = fileName;
+async function onDocumentEntryDuplicatePatientClicked(event, recycledTable) {
+    const selectedRow = event.target.closest("#patient-duplication-table tbody tr[data-patient-id]");
+    if (!selectedRow) {
+        cleanupHandleDuplicateDocumentReference(recycledTable);
+        return;
     }
-    else {
-        const jsonString = JSON.stringify(documentEntry, null, 2);
-        downloadLink.href = URL.createObjectURL(new Blob([jsonString], { type: "application/json" }));
-        downloadLink.download = `${fileName}.json`;
-    }
+    console.log("Selected patient row for duplication:", selectedRow);
 
-    downloadLink.style.display = "none";
-    document.body.appendChild(downloadLink);
-    
-    downloadLink.click();
-
-    document.body.removeChild(downloadLink);
-    restoreButton(button);
 }
 
+function cleanupHandleDuplicateDocumentReference(recycledTable) {
+    console.log("Removing recycled patient duplication table from DOM.");
+    document.body.removeEventListener("click", onDocumentEntryDuplicatePatientClicked);
+    document.body.removeChild(recycledTable);
+}
+
+function clonePatientTableFromDOMAsPatientDuplicationForm() {
+    const existingTable = document.querySelector("#patient-identifiers table");
+    if (!existingTable) return null;
+
+    const newTable = existingTable.cloneNode(true);
+    newTable.id = "patient-duplication-table";
+
+    // Remove the last header row and any existing expand rows or action columns or styling
+    newTable.querySelectorAll("tbody tr").forEach(row => row.classList.remove("btn-docs--active"));
+    newTable.querySelectorAll(".doc-expand-row").forEach(node => node.remove());
+    newTable.querySelectorAll("td.pid-actions").forEach(node => node.remove());
+
+    return newTable;
+}
 
 function removeLargeDocumentContent(payload) {
     if (payload?.documentReference && typeof payload.documentReference === "object") {

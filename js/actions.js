@@ -1,6 +1,5 @@
 import { proxyFetch } from "./api.js";
-import { escapeHtml, fileToBase64, detectFileType, tryGetAsJson, isUploadableDocumentEntry } from "./utils.js";
-import { uploadDocumentEntry } from "./documentsApi.js";
+import { escapeHtml, fileToBase64, detectFileType } from "./utils.js";
 
 export function setupActionSection(source) {
     const actionEl = document.getElementById("action");
@@ -109,37 +108,38 @@ async function uploadDocument(source, fileInput, responseEl) {
     
     const patient = document.getElementById("uploadDocumentPatientIdentifier").value.trim();
     
-    responseEl.textContent = "Generating random test data…";
-    const jsonObject = tryGetAsJson(await file.text());
+    if (!patient) { alert("Please select a patient first."); return; }
 
-    if(isUploadableDocumentEntry(jsonObject)){
-        responseEl.textContent = "Uploading DocumentEntry object as complete document and metadata...";
-        await uploadDocumentEntry(source, jsonObject);
-        responseEl.textContent = "Upload complete.";
-        return;
-    }
+    responseEl.textContent = "Generating random test data…";
 
     const documentReference = (await generateRandomTestData(source, patient, 1))[0];
     
-    responseEl.textContent = "Preparing document…";
-
     const base64File = await fileToBase64(file);
     documentReference.document.data = base64File;
     documentReference.documentEntry.mimeType = detectFileType(base64File).mimeType;
     documentReference.documentEntry.size = `${file.size}`;
     
+    // console.log(file.size);
+    
+    // console.log(documentReference);
 
     responseEl.hidden = false;
     responseEl.className = "upload-response upload-response--loading";
     responseEl.textContent = "Uploading document…";
 
     try {
-        const response = await uploadDocumentEntry(source, documentReference);
+        const targetUrl = `${source}/api/rest/document-entry`;
+        const body = JSON.stringify(documentReference);
+        const res = await proxyFetch(targetUrl, { method: "POST", body, contentType: "application/json" });
+        const text = await res.text();
 
-        let pretty = JSON.stringify(response, null, 2);
+        let pretty = text;
+        try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { }
 
-        responseEl.className = "upload-response upload-response--ok";
-        responseEl.textContent = pretty;
+        responseEl.className = res.ok
+            ? "upload-response upload-response--ok"
+            : "upload-response upload-response--error";
+        responseEl.textContent = `HTTP ${res.status}\n\n${pretty}`;
     } catch (err) {
         responseEl.className = "upload-response upload-response--error";
         responseEl.textContent = escapeHtml(err.message);

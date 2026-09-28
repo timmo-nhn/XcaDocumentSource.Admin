@@ -92,11 +92,21 @@ function setupInputDropdown() {
         "https://viti-aktivt-sykehus.d-xcads.pjd.nhn.no",
         "https://viti-stort-sykehus.d-xcads.pjd.nhn.no",
         "https://viti-travelt-sykehus.d-xcads.pjd.nhn.no",
+        "https://viti-bjarne-sykehus.t-xcads.pjd.nhn.no",
+        "https://viti-kurt-sykehus.t-xcads.pjd.nhn.no",
+        "https://viti-rex-sykehus.t-xcads.pjd.nhn.no",
+        "https://viti-tim-sykehus.t-xcads.pjd.nhn.no",
+        "https://viti-origo-sykehus.t-xcads.pjd.nhn.no",
         "https://bjarne-sykehus.t-xcads.pjd.nhn.no",
         "https://kurt-sykehus.t-xcads.pjd.nhn.no",
         "https://rex-sykehus.t-xcads.pjd.nhn.no",
         "https://tim-sykehus.t-xcads.pjd.nhn.no",
         "https://origo-sykehus.t-xcads.pjd.nhn.no",
+        "https://bjarne-sykehus.q-xcads.pjd.nhn.no",
+        "https://kurt-sykehus.q-xcads.pjd.nhn.no",
+        "https://rex-sykehus.q-xcads.pjd.nhn.no",
+        "https://tim-sykehus.q-xcads.pjd.nhn.no",
+        "https://origo-sykehus.q-xcads.pjd.nhn.no",
     ];
 
     sourceInputMenu.innerHTML = sourceOptions
