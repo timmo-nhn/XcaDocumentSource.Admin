@@ -3,10 +3,6 @@ import { fetchPatientIdentifiers } from "./documents.js";
 import { setNewIdentifiersForDocumentEntry } from "./utils.js";
 
 export async function onDocumentEntryDuplicatePatientClicked(event, source, documentId, backdrop) {
-    if (document.body.contains(backdrop)) {
-        document.body.removeChild(backdrop);
-    }
-
     const selectedRow = event.target.closest("#patient-duplication-table tbody tr[data-patient-id]");
     if (!selectedRow) {
         cleanupHandleDuplicateDocumentReference(backdrop);
@@ -30,7 +26,7 @@ export async function onDocumentEntryDuplicatePatientClicked(event, source, docu
         documentEntryToDuplicate.documentEntry.sourcePatientInfo.patientId.id = targetPatientId;
         documentEntryToDuplicate.documentEntry.sourcePatientInfo.patientId.system = targetPatientSystem;
 
-        const response = await uploadDocumentEntry(source, documentEntryToDuplicate);
+        await uploadDocumentEntry(source, documentEntryToDuplicate);
 
         cleanupHandleDuplicateDocumentReference(backdrop);
         await fetchPatientIdentifiers(source);
@@ -38,9 +34,6 @@ export async function onDocumentEntryDuplicatePatientClicked(event, source, docu
 }
 
 function cleanupHandleDuplicateDocumentReference(backdrop) {
-    if (backdrop._duplicateClickHandler) {
-        backdrop.removeEventListener("click", backdrop._duplicateClickHandler);
-    }
     if (document.body.contains(backdrop)) {
         document.body.removeChild(backdrop);
     }
@@ -59,6 +52,7 @@ export function clonePatientTableFromDOMAsPatientDuplicationForm() {
     newTable.querySelectorAll("tbody tr").forEach(row => row.classList.remove("btn-docs--active"));
     newTable.querySelectorAll(".doc-expand-row").forEach(node => node.remove());
     newTable.querySelectorAll("td.pid-actions").forEach(node => node.remove());
-
+    newTable.querySelectorAll("td.action-column").forEach(node => node.remove());
+    newTable.querySelectorAll("thead tr th").remove();
     return newTable;
 }

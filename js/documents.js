@@ -4,6 +4,7 @@ import { escapeHtml, formatSize } from "./utils.js";
 import {
     deleteAllDataForPatient,
     deleteDocumentById,
+    getDocumentEntryAndDocumentById,
     getDocumentEntryById,
     listDocumentEntries,
     listPatients,
@@ -11,6 +12,7 @@ import {
 } from "./documentsApi.js";
 import { openDocumentJsonEditor } from "./documentJsonEditor.js";
 import * as documentDuplication from "./documentDuplication.js";
+import { createZipBlob } from "./zip.js";
 
 const LOADING_ICON_HTML = `<img src="/loading.gif" alt="Loading" width="16" height="16">`;
 
@@ -117,9 +119,110 @@ function renderPatientRow(entry, index) {
 
 function bindPatientRow(row, source) {
     addUploadDocumentButton(row);
+    addDownloadAllDocumentsButton(row, source);
     addDeleteAllDataButton(row, source);
     // addFindPatientInSyntpopButton(row);
     addDocumentListToggle(row, source);
+}
+
+function addDownloadAllDocumentsButton(row, source) {
+    if (row.dataset.downloadAttached === "true") return;
+    row.dataset.downloadAttached = "true";
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn-action-doc";
+    button.textContent = "📦";
+    button.title = "Download all document entries as a ZIP";
+    button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        await downloadAllDocumentsForPatient(button, source, row);
+    });
+
+    row.querySelector("td.pid-actions").append(button);
+}
+
+async function downloadAllDocumentsForPatient(button, source, row) {
+    const patientId = row.dataset.patientId;
+    if (!patientId || !row.dataset.patientIdSystem) {
+        throw new Error("Missing patient identifier or patient system.");
+    }
+
+    setButtonLoading(button);
+    try {
+        const documents = await listDocumentEntries(source, getPatientLookupId(row));
+        if (documents.length === 0) {
+            alert(`No documents found for patient ${patientId}.`);
+            return;
+        }
+
+        const usedNames = new Set();
+        const requests = documents.map((document) => {
+            const reference = document?.documentReference;
+            const documentEntryId = reference?.id;
+            if (!documentEntryId) {
+                throw new Error("A document entry is missing its ID.");
+            }
+
+            const baseName = sanitizeFileName(reference.title || reference.name || documentEntryId);
+            const fileName = uniqueFileName(`${baseName}-${sanitizeFileName(documentEntryId)}.json`, usedNames);
+            return { documentEntryId, fileName };
+        });
+
+        const files = (await Promise.all(requests.map(async ({ documentEntryId, fileName }) => {
+            try {
+                const payload = await getDocumentEntryAndDocumentById(source, documentEntryId);
+                return { name: fileName, content: JSON.stringify(payload, null, 2) };
+            } catch (err) {
+                if (err?.status === 404) {
+                    console.warn(`Skipping missing document entry ${documentEntryId} while creating patient ZIP.`, err);
+                    return null;
+                }
+                throw err;
+            }
+        }))).filter((file) => file !== null);
+
+        const patientName = sanitizeFileName(
+            [row.dataset.patientFirstName, row.dataset.patientLastName].filter(Boolean).join("-")
+        );
+        const archiveName = `${patientName ? `${patientName}-` : ""}${sanitizeFileName(patientId)}-documents.zip`;
+        downloadBlob(createZipBlob(files), archiveName);
+    } catch (err) {
+        alert(`Failed to download documents for patient.\n\n${err.message}`);
+    } finally {
+        restoreButton(button, "📦");
+    }
+}
+
+function sanitizeFileName(value) {
+    return String(value ?? "")
+        .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "-")
+        .replace(/\s+/g, " ")
+        .replace(/[. ]+$/g, "")
+        .trim()
+        .slice(0, 120);
+}
+
+function uniqueFileName(fileName, usedNames) {
+    let candidate = fileName;
+    let suffix = 2;
+    while (usedNames.has(candidate.toLowerCase())) {
+        candidate = fileName.replace(/\.json$/i, `-${suffix}.json`);
+        suffix += 1;
+    }
+    usedNames.add(candidate.toLowerCase());
+    return candidate;
+}
+
+function downloadBlob(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 0);
 }
 
 
@@ -268,7 +371,10 @@ function renderDocumentTable(documents) {
             : "—";
 
         const saveButton = documentId
-            ? `<button type="button" class="btn-action-doc btn-save-document" data-doc-id="${encodeURIComponent(documentId)}" title="Save this document">💾</button>`
+            ? `<button type="button" class="btn-action-doc btn-save-document"
+                data-doc-id="${encodeURIComponent(documentReferenceId)}"
+                data-doc-title="${encodeURIComponent(titleRaw)}"
+                title="Save this document">💾</button>`
             : "—";
 
         return `
@@ -433,10 +539,45 @@ async function handleDuplicateDocumentReference(button, source, patientId, expan
     const documentId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : "";
 
     const recycledTable = documentDuplication.clonePatientTableFromDOMAsPatientDuplicationForm();
-    document.body.appendChild(recycledTable);
+    const duplicationBackdrop = document.createElement("div");
+    duplicationBackdrop.id = "patient-duplication-backdrop";
+    duplicationBackdrop.appendChild(recycledTable);
+    document.body.appendChild(duplicationBackdrop);
     document.body.style.overflow = "hidden";
 
-    document.body.addEventListener("click", (event) => documentDuplication.onDocumentEntryDuplicatePatientClicked(event, source, documentId, recycledTable));
+    duplicationBackdrop.addEventListener("click", (event) => documentDuplication.onDocumentEntryDuplicatePatientClicked(event, source, documentId, duplicationBackdrop));
+}
+
+async function handleSaveDocument(button, source, patientIdOrUniqueId, expandRow) {
+    const documentEntryId = button.dataset.docId;
+    const title = decodeURIComponent(button.dataset.docTitle);
+
+    if (!documentEntryId) {
+        throw new Error("Missing document entry id.");
+    }
+
+    setButtonLoading(button);
+    let payload;
+    try {
+        payload = await getDocumentEntryAndDocumentById(source, documentEntryId);
+    } catch (err) {
+        alert(`Failed to load document entry.\n\n${err.message}`);
+        restoreButton(button, "💾");
+        return;
+    }
+
+    var docRefString = JSON.stringify(payload);
+
+    var blob = new Blob([docRefString], { type: "application/json" });
+
+    restoreButton(button, "💾");
+
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = `${title ? `${title}` : ""}-${documentEntryId}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
 }
 
 

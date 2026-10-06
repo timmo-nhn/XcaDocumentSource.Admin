@@ -10,12 +10,22 @@ export async function listPatients(source) {
 }
 
 export async function listDocumentEntries(source, patientId) {
-    const params = new URLSearchParams({ id: patientId, pageNumber: 1, pageSize: 50 });
-    const response = await proxyFetch(`${source}/api/rest/document-list?${params}`);
-    await ensureOk(response, "Failed to load document list.");
+    const pageSize = 50;
+    const entries = [];
 
-    const data = await response.json();
-    return data?.documentListEntries ?? [];
+    for (let pageNumber = 1; ; pageNumber += 1) {
+        const params = new URLSearchParams({ id: patientId, pageNumber, pageSize });
+        const response = await proxyFetch(`${source}/api/rest/document-list?${params}`);
+        await ensureOk(response, "Failed to load document list.");
+
+        const data = await response.json();
+        const pageEntries = data?.documentListEntries ?? [];
+        entries.push(...pageEntries);
+
+        if (pageEntries.length < pageSize) {
+            return entries;
+        }
+    }
 }
 
 export async function deleteAllDataForPatient(source, patientIdentifier, patientSystem) {
@@ -32,6 +42,13 @@ export async function deleteDocumentById(source, documentId) {
 
 export async function getDocumentEntryById(source, documentEntryId, includeDocument = false) {
     const params = new URLSearchParams({ id: documentEntryId, includeDocument: includeDocument ? "true" : "false" });
+    const response = await proxyFetch(`${source}/api/rest/document-entry?${params}`);
+    await ensureOk(response, "Failed to load document entry.");
+    return getResponseAsJson(response);
+}
+
+export async function getDocumentEntryAndDocumentById(source, documentEntryId) {
+    const params = new URLSearchParams({ id: documentEntryId });
     const response = await proxyFetch(`${source}/api/rest/document-entry?${params}`);
     await ensureOk(response, "Failed to load document entry.");
     return getResponseAsJson(response);
@@ -61,5 +78,7 @@ export async function uploadDocumentEntry(source, documentEntry) {
 async function ensureOk(response, contextMessage) {
     if (response.ok) return;
     const responseText = await response.text();
-    throw new Error(`${contextMessage}\n\nHTTP ${response.status}${responseText ? `\n\n${responseText}` : ""}`);
+    const error = new Error(`${contextMessage}\n\nHTTP ${response.status}${responseText ? `\n\n${responseText}` : ""}`);
+    error.status = response.status;
+    throw error;
 }

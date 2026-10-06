@@ -115,3 +115,11 @@ button:hover {
     border: 1px solid var(--color-border);
     border-radius: 10px;
 }
+#swaggerButton {
+    height: 2em;
+}
+
+#swaggerButton:hover {
+    filter: brightness(1.2);
+    cursor: pointer;
+}

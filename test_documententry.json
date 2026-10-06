@@ -1,0 +1,110 @@
+{
+  "documentEntry": {
+    "author": [
+      {
+        "organization": {
+          "id": "981275721",
+          "organizationName": "STIFTELSEN BETANIEN HOSPITAL SKIEN",
+          "assigningAuthority": "2.16.578.1.12.4.1.4.101"
+        },
+        "department": {},
+        "person": {
+          "firstName": "GRØNN",
+          "lastName": "VITS"
+        },
+        "role": {},
+        "speciality": {}
+      }
+    ],
+    "availabilityStatus": "urn:oasis:names:tc:ebxml-regrep:StatusType:Approved",
+    "classCode": {
+      "code": "A00-1",
+      "codeSystem": "2.16.578.1.12.4.1.1.9602",
+      "displayName": "Epikriser og sammenfatninger"
+    },
+    "confidentialityCode": [
+      {
+        "code": "N",
+        "codeSystem": "2.16.840.1.113883.5.25",
+        "displayName": "Normal"
+      }
+    ],
+    "creationTime": "2026-04-13T08:28:21",
+    "eventCodeList": {},
+    "formatCode": {
+      "code": "urn:hl7-org:sdwg:ccda-nonXMLBody:2.1",
+      "codeSystem": "http://ihe.net/fhir/ihe.formatcode.fhir/CodeSystem/formatcode",
+      "displayName": "urn:hl7-org:sdwg:ccda-nonXMLBody:2.1"
+    },
+    "hash": "3e3f065835c693cb1506b78302e25dd8319cd406",
+    "healthCareFacilityTypeCode": {
+      "code": "86.907",
+      "codeSystem": "2.16.578.1.12.4.1.1.1303",
+      "displayName": "Ambulansetjenester"
+    },
+    "homeCommunityId": "2.16.578.1.12.4.5.100.3.15",
+    "languageCode": "Unknown",
+    "legalAuthenticator": {},
+    "mimeType": "application/xml",
+    "objectType": "urn:uuid:7edca82f-054d-47f2-a032-9b2a5b5186c1",
+    "practiceSettingCode": {
+      "code": "1",
+      "codeSystem": "2.16.578.1.12.4.1.1.8653",
+      "displayName": "Pleietjenester"
+    },
+    "repositoryUniqueId": "2.16.578.1.12.4.5.100.3.15.25",
+    "size": "80728",
+    "serviceStartTime": "2026-04-06T08:28:01",
+    "serviceStopTime": "2026-04-07T08:28:01",
+    "sourcePatientInfo": {
+      "patientId": {
+        "id": "8f5a9241-83c4-452f-b779-98aeea48d07a",
+        "system": "2.16.578.1.12.4.5.100.3.15"
+      },
+      "firstName": "SNILL",
+      "lastName": "JUBEL",
+      "birthTime": "1993-11-19T00:00:00",
+      "gender": "M"
+    },
+    "title": "XcaDS - Akuttjournal innkomstnotat",
+    "typeCode": {
+      "code": "A01-2",
+      "codeSystem": "2.16.578.1.12.4.1.1.9602",
+      "displayName": "Kriseplan"
+    },
+    "uniqueId": "c11566f3-cd85-43de-9175-5b7ca30cbdb7",
+    "id": "c11566f3-cd85-43de-9175-5b7ca30cbdb7"
+  },
+  "submissionSet": {
+    "author": [
+      {
+        "organization": {
+          "id": "981275721",
+          "organizationName": "STIFTELSEN BETANIEN HOSPITAL SKIEN",
+          "assigningAuthority": "2.16.578.1.12.4.1.4.101"
+        },
+        "department": {
+          "organizationName": "STIFTELSEN BETANIEN HOSPITAL SKIEN"
+        },
+        "person": {},
+        "role": {},
+        "speciality": {}
+      }
+    ],
+    "homeCommunityId": "2.16.578.1.12.4.5.100.3.15",
+    "title": "SubmissionSet-59769303965-04/13/2026 08:27:45",
+    "uniqueId": "2.16.578.1.12.4.5.7.4.50087.10345.31065",
+    "id": "ef8e9529-bc96-415a-bf5a-356b139c1629"
+  },
+  "association": {
+    "associationType": "urn:oasis:names:tc:ebxml-regrep:AssociationType:HasMember",
+    "sourceObject": "ef8e9529-bc96-415a-bf5a-356b139c1629",
+    "submissionSetStatus": "Original",
+    "targetObject": "c11566f3-cd85-43de-9175-5b7ca30cbdb7",
+    "id": "67333b1b-262b-4ad2-b406-cc8353c709ce"
+  },
+  "document": {
+    "documentId": "c11566f3-cd85-43de-9175-5b7ca30cbdb7",
+    "data": "BASE64-CONTENT"
+  }
+}

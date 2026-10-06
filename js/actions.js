@@ -1,5 +1,12 @@
 import { proxyFetch } from "./api.js";
-import { escapeHtml, fileToBase64, detectFileType } from "./utils.js";
+import { uploadDocumentEntry } from "./documentsApi.js";
+import {
+    escapeHtml,
+    fileToBase64,
+    detectFileType,
+    isUploadableDocumentEntry,
+    setNewIdentifiersForDocumentEntry
+} from "./utils.js";
 
 export function setupActionSection(source) {
     const actionEl = document.getElementById("action");
@@ -70,17 +77,20 @@ async function setupUploadDocument(source) {
     const uploadButton = document.getElementById("uploadDocumentButton");
     const responseEl = document.getElementById("uploadDocumentResponse");
 
-    const uploadForm = document.getElementById("uploadDocument");
-
-    fileInput.addEventListener("change", function () {
-        fileLabelEl.textContent = fileInput.files[0]?.name ?? "Choose file";
-    });
+    fileInput.onchange = function () {
+        const files = [...fileInput.files];
+        fileLabelEl.textContent = files.length === 0
+            ? "Choose documents"
+            : files.length === 1
+                ? files[0].name
+                : `${files.length} files selected`;
+    };
 
     // Clone to avoid stacking listeners if Connect is clicked multiple times
     const newUploadButton = uploadButton.cloneNode(true);
     uploadButton.replaceWith(newUploadButton);
 
-    newUploadButton.addEventListener("click", () => uploadDocument(source, fileInput, responseEl));
+    newUploadButton.addEventListener("click", () => uploadDocument(source, fileInput, responseEl, newUploadButton));
 }
 
 export function setUploadDocumentField(event, patientId, patientIdSystem) {
@@ -102,51 +112,103 @@ export function setUploadDocumentField(event, patientId, patientIdSystem) {
     }
 }
 
-async function uploadDocument(source, fileInput, responseEl) {
-    const file = fileInput.files[0];
-    if (!file) { alert("Please select a file first."); return; }
-    
+async function uploadDocument(source, fileInput, responseEl, uploadButton) {
+    const files = [...fileInput.files];
+    if (files.length === 0) { alert("Please select one or more files first."); return; }
+
     const patient = document.getElementById("uploadDocumentPatientIdentifier").value.trim();
-    
-    if (!patient) { alert("Please select a patient first."); return; }
-
-    responseEl.textContent = "Generating random test data…";
-
-    const documentReference = (await generateRandomTestData(source, patient, 1))[0];
-    
-    const base64File = await fileToBase64(file);
-    documentReference.document.data = base64File;
-    documentReference.documentEntry.mimeType = detectFileType(base64File).mimeType;
-    documentReference.documentEntry.size = `${file.size}`;
-    
-    // console.log(file.size);
-    
-    // console.log(documentReference);
 
     responseEl.hidden = false;
     responseEl.className = "upload-response upload-response--loading";
-    responseEl.textContent = "Uploading document…";
+    responseEl.textContent = "Preparing documents…";
+    uploadButton.disabled = true;
 
     try {
-        const targetUrl = `${source}/api/rest/document-entry`;
-        const body = JSON.stringify(documentReference);
-        const res = await proxyFetch(targetUrl, { method: "POST", body, contentType: "application/json" });
-        const text = await res.text();
+        const { readyEntries, regularFiles } = await classifyUploadFiles(files);
+        if (regularFiles.length > 0 && !patient) {
+            throw new Error("Please select a patient before uploading regular document files.");
+        }
 
-        let pretty = text;
-        try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch { }
+        if (regularFiles.length > 0) {
+            responseEl.textContent = "Generating metadata…";
+            const generatedEntries = await generateRandomTestData(source, patient, regularFiles.length);
+            if (!Array.isArray(generatedEntries) || generatedEntries.length !== regularFiles.length) {
+                throw new Error(`Expected ${regularFiles.length} generated document entries, but received ${generatedEntries?.length ?? 0}.`);
+            }
 
-        responseEl.className = res.ok
-            ? "upload-response upload-response--ok"
-            : "upload-response upload-response--error";
-        responseEl.textContent = `HTTP ${res.status}\n\n${pretty}`;
+            for (let index = 0; index < regularFiles.length; index += 1) {
+                const file = regularFiles[index];
+                const payload = generatedEntries[index];
+                const bytes = new Uint8Array(await file.arrayBuffer());
+                payload.document.data = await fileToBase64(file);
+                payload.documentEntry.mimeType = detectFileType(bytes, file.type).mimeType;
+                payload.documentEntry.size = `${file.size}`;
+                readyEntries.push({ name: file.name, payload });
+            }
+        }
+
+        const results = [];
+        for (let index = 0; index < readyEntries.length; index += 1) {
+            const entry = readyEntries[index];
+            responseEl.textContent = `Uploading ${index + 1} of ${readyEntries.length}: ${entry.name}`;
+            try {
+                if (entry.refreshIdentifiers) {
+                    setNewIdentifiersForDocumentEntry(entry.payload);
+                }
+                await uploadDocumentEntry(source, entry.payload);
+                results.push(`✓ ${entry.name}`);
+            } catch (err) {
+                throw new Error(`${entry.name}: ${err.message}`);
+            }
+        }
+
+        responseEl.className = "upload-response upload-response--ok";
+        responseEl.textContent = `Uploaded ${results.length} document${results.length === 1 ? "" : "s"}.\n\n${results.join("\n")}`;
+        fileInput.value = "";
+        document.getElementById("uploadDocumentLabel").textContent = "Choose documents";
+        document.getElementById("submitButton").click();
     } catch (err) {
         responseEl.className = "upload-response upload-response--error";
-        responseEl.textContent = escapeHtml(err.message);
+        responseEl.textContent = err.message;
+    } finally {
+        uploadButton.disabled = false;
+    }
+}
+
+async function classifyUploadFiles(files) {
+    const readyEntries = [];
+    const regularFiles = [];
+
+    for (const file of files) {
+        if (!file.name.toLowerCase().endsWith(".json")) {
+            regularFiles.push(file);
+            continue;
+        }
+
+        let parsed;
+        try {
+            parsed = JSON.parse(await file.text());
+        } catch {
+            regularFiles.push(file);
+            continue;
+        }
+
+        const entries = Array.isArray(parsed) ? parsed : [parsed];
+        if (!entries.every(isUploadableDocumentEntry)) {
+            regularFiles.push(file);
+            continue;
+        }
+
+        entries.forEach((payload, index) => {
+            readyEntries.push({
+                name: entries.length === 1 ? file.name : `${file.name} [${index + 1}]`,
+                payload,
+                refreshIdentifiers: true
+            });
+        });
     }
 
-    // Refresh the status section to show the new data
-    document.getElementById("submitButton").click();
+    return { readyEntries, regularFiles };
 }
 
 async function generateRandomTestData(source, patientIdentifier, amount = 1) {

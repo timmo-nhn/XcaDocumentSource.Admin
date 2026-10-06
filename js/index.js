@@ -9,12 +9,18 @@ const apiKeyInput  = document.getElementById("apiKeyInput");
 const apiKeyStatus = document.getElementById("apiKeyStatus");
 const connectionStatus = document.getElementById("connectionStatus");
 const submitButton = document.getElementById("submitButton");
+const swaggerButton = document.getElementById("swaggerButton");
 
 // Submit on Enter from either input field
 [sourceInput, apiKeyInput].forEach(el => {
     el.addEventListener("keydown", e => {
         if (e.key === "Enter") { e.preventDefault(); submitButton.click(); }
     });
+});
+
+swaggerButton.addEventListener("click", () => {
+    const source = sourceInput.value.trim().replace(/\/$/, "");
+    if (source) window.open(`${source}/swagger`, "_blank");
 });
 
 setupInputDropdown();
@@ -89,19 +95,30 @@ function setupInputDropdown() {
 
     const sourceOptions = [
         "https://localhost:7176",
+
         "https://viti-aktivt-sykehus.d-xcads.pjd.nhn.no",
         "https://viti-stort-sykehus.d-xcads.pjd.nhn.no",
         "https://viti-travelt-sykehus.d-xcads.pjd.nhn.no",
+        "https://viti-nytt-sykehus.d-xcads.pjd.nhn.no",
+
         "https://viti-bjarne-sykehus.t-xcads.pjd.nhn.no",
         "https://viti-kurt-sykehus.t-xcads.pjd.nhn.no",
         "https://viti-rex-sykehus.t-xcads.pjd.nhn.no",
         "https://viti-tim-sykehus.t-xcads.pjd.nhn.no",
         "https://viti-origo-sykehus.t-xcads.pjd.nhn.no",
+
         "https://bjarne-sykehus.t-xcads.pjd.nhn.no",
         "https://kurt-sykehus.t-xcads.pjd.nhn.no",
         "https://rex-sykehus.t-xcads.pjd.nhn.no",
         "https://tim-sykehus.t-xcads.pjd.nhn.no",
         "https://origo-sykehus.t-xcads.pjd.nhn.no",
+
+        "https://viti-bjarne-sykehus.q-xcads.pjd.nhn.no",
+        "https://viti-kurt-sykehus.q-xcads.pjd.nhn.no",
+        "https://viti-rex-sykehus.q-xcads.pjd.nhn.no",
+        "https://viti-tim-sykehus.q-xcads.pjd.nhn.no",
+        "https://viti-origo-sykehus.q-xcads.pjd.nhn.no",
+
         "https://bjarne-sykehus.q-xcads.pjd.nhn.no",
         "https://kurt-sykehus.q-xcads.pjd.nhn.no",
         "https://rex-sykehus.q-xcads.pjd.nhn.no",

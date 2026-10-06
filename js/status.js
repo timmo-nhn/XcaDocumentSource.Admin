@@ -7,19 +7,21 @@ export async function fetchHealthCheck(source) {
 
     try {
         const res = await proxyFetch(`${source}/api/health-check`);
-        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        if (!res.ok) console.warn(`HTTP ${res.status}`);
         const data = await res.json();
 
         const status = data.healthReport?.status ?? "unknown";
         const isHealthy = status.toLowerCase() === "healthy";
-        const registryOk = data.registryRepository?.registryReadOk || data.registryRepository?.registryWriteOk;
-        const repositoryOk = data.registryRepository?.repositoryReadOk || data.registryRepository?.repositoryWriteOk;
+        const registryOk = data.healthReport?.entries.registry.status === "healthy";
+        const repositoryOk = data.healthReport?.entries.repository.status === "healthy";
+        const atnaLogOk = data.healthReport?.entries.atnalogexport.status === "healthy";
         const uptime = data.uptimeInSeconds != null ? formatUptime(data.uptimeInSeconds) : null;
 
         container.innerHTML = `
             ${renderCard("Overall Status", isHealthy ? "ok" : "error", capitalize(status))}
             ${renderCard("Registry",       boolStatus(registryOk),   boolLabel(registryOk))}
             ${renderCard("Repository",     boolStatus(repositoryOk), boolLabel(repositoryOk))}
+            ${renderCard("AtnaLog",     boolStatus(atnaLogOk), boolLabel(atnaLogOk))}
             ${uptime ? renderCard("Uptime", "neutral", uptime) : ""}
         `;
     } catch (err) {
@@ -82,6 +84,7 @@ export async function fetchBackendImplementations(source) {
             ${renderCard("Registry", "neutral", data.filter(itm => itm.serviceType === "IRegistry")[0]?.implementationType ?? "—")}
             ${renderCard("Repository", "neutral", data.filter(itm => itm.serviceType === "IRepository")[0]?.implementationType ?? "—")}
             ${renderCard("PolicyRepository", "neutral", data.filter(itm => itm.serviceType === "IPolicyRepository")[0]?.implementationType ?? "—")}
+            ${renderCard("AtnaLog DLQ", "neutral", data.filter(itm => itm.serviceType === "IAtnaLogDLQStore")[0]?.implementationType ?? "—")}
         `;
     } catch (err) {
         container.innerHTML = renderCard("Backend Implementations", "error", err.message);

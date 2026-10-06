@@ -15,6 +15,7 @@ export function setNewIdentifiersForDocumentEntry(documentEntry) {
     const newDocumentEntryId = uuidv4();
     const newDocumentId = uuidv4();
     const newSubmissionSetId = uuidv4();
+    const newSubmissionSetUniqueId = uuidv4();
     const newAssociationId = uuidv4();
 
     documentEntry.documentEntry.id = newDocumentEntryId;
@@ -22,7 +23,9 @@ export function setNewIdentifiersForDocumentEntry(documentEntry) {
     documentEntry.documentEntry.uniqueId = newDocumentId;
     documentEntry.document.documentId = newDocumentId;
 
-    documentEntry.submissionSet.Id = newSubmissionSetId;
+    documentEntry.submissionSet.id = newSubmissionSetId;
+    documentEntry.submissionSet.uniqueId = newSubmissionSetUniqueId;
+    delete documentEntry.submissionSet.Id;
 
     documentEntry.association.id = newAssociationId;
     documentEntry.association.sourceObject = newSubmissionSetId;
