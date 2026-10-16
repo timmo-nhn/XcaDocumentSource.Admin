@@ -106,6 +106,7 @@ function setupInputDropdown() {
         "https://viti-rex-sykehus.t-xcads.pjd.nhn.no",
         "https://viti-tim-sykehus.t-xcads.pjd.nhn.no",
         "https://viti-origo-sykehus.t-xcads.pjd.nhn.no",
+        "https://viti-repo-docy.t-xcads.pjd.nhn.no",
 
         "https://bjarne-sykehus.t-xcads.pjd.nhn.no",
         "https://kurt-sykehus.t-xcads.pjd.nhn.no",

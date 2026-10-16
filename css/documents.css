@@ -63,6 +63,10 @@ details[open] .doc-summary::before {
     background: var(--purple-900);
 }
 
+.doc-load-more {
+    margin-top: 0.75rem;
+}
+
 .doc-table {
     width: 100%;
     border-collapse: collapse;

@@ -4,8 +4,10 @@ import { escapeHtml, formatSize } from "./utils.js";
 import {
     deleteAllDataForPatient,
     deleteDocumentById,
+    DOCUMENT_LIST_PAGE_SIZE,
     getDocumentEntryAndDocumentById,
     getDocumentEntryById,
+    listAllDocumentEntries,
     listDocumentEntries,
     listPatients,
     patchDocumentEntryById
@@ -33,7 +35,7 @@ export async function fetchPatientIdentifiers(source, containerInput) {
         renderPatientsTable(container, entries);
 
         const dataRows = [...container.querySelectorAll("tbody tr[data-patient-id]")];
-        dataRows.forEach((row) => bindPatientRow(row, source));
+        dataRows.forEach((row) => setupPatientRow(row, source));
     } catch (err) {
         container.innerHTML = `<p class="error-text">${escapeHtml(err.message)}</p>`;
     }
@@ -62,7 +64,7 @@ export async function setupFetchDocumentEntryById(source) {
 }
 
 function renderPatientsTable(patientTableContainer, entries) {
-    const sortedEntries = [...entries];
+    const sortedEntries = [...entries].sort((a, b) => a?.firstName?.localeCompare(b?.firstName));
     const renderedPatientRows = sortedEntries.map((entry, index) => renderPatientRow(entry, index)).join("");
 
     setPatientHeaderCount(patientTableContainer, entries.length);
@@ -117,7 +119,7 @@ function renderPatientRow(entry, index) {
         </tr>`;
 }
 
-function bindPatientRow(row, source) {
+function setupPatientRow(row, source) {
     addUploadDocumentButton(row);
     addDownloadAllDocumentsButton(row, source);
     addDeleteAllDataButton(row, source);
@@ -150,11 +152,13 @@ async function downloadAllDocumentsForPatient(button, source, row) {
 
     setButtonLoading(button);
     try {
-        const documents = await listDocumentEntries(source, getPatientLookupId(row));
+        const documents = await listAllDocumentEntries(source, getPatientLookupId(row));
         if (documents.length === 0) {
             alert(`No documents found for patient ${patientId}.`);
             return;
         }
+
+        const instance = URL.parse(source);
 
         const usedNames = new Set();
         const requests = documents.map((document) => {
@@ -163,9 +167,8 @@ async function downloadAllDocumentsForPatient(button, source, row) {
             if (!documentEntryId) {
                 throw new Error("A document entry is missing its ID.");
             }
-
             const baseName = sanitizeFileName(reference.title || reference.name || documentEntryId);
-            const fileName = uniqueFileName(`${baseName}-${sanitizeFileName(documentEntryId)}.json`, usedNames);
+            const fileName = uniqueFileName(`${baseName}-${instance.hostname || "xcads"}.json`, usedNames);
             return { documentEntryId, fileName };
         });
 
@@ -185,7 +188,7 @@ async function downloadAllDocumentsForPatient(button, source, row) {
         const patientName = sanitizeFileName(
             [row.dataset.patientFirstName, row.dataset.patientLastName].filter(Boolean).join("-")
         );
-        const archiveName = `${patientName ? `${patientName}-` : ""}${sanitizeFileName(patientId)}-documents.zip`;
+        const archiveName = `${patientName ? `${patientName}-` : ""}${instance.hostname || "xcads"}-${sanitizeFileName(patientId)}-documents.zip`;
         downloadBlob(createZipBlob(files), archiveName);
     } catch (err) {
         alert(`Failed to download documents for patient.\n\n${err.message}`);
@@ -339,13 +342,54 @@ async function loadDocumentList(source, patientId, expandRow) {
 
         content.innerHTML = renderDocumentTable(documents);
         wireDocumentTableInteractions(content, source, patientId, expandRow);
+        if (documents.length === DOCUMENT_LIST_PAGE_SIZE) {
+            addLoadMoreDocumentsButton(content, source, patientId);
+        }
     } catch (err) {
+        expandRow.dataset.loaded = "false";
         content.innerHTML = `<p class="error-text">${escapeHtml(err.message)}</p>`;
     }
 }
 
-function renderDocumentTable(documents) {
-    const rows = documents.map((docRef) => {
+function addLoadMoreDocumentsButton(content, source, patientId) {
+    let nextPage = 2;
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn-docs doc-load-more";
+    button.textContent = "Load more";
+    const errorText = document.createElement("p");
+    errorText.className = "error-text";
+
+    button.addEventListener("click", async (event) => {
+        event.stopPropagation();
+        if (button.disabled) return;
+
+        setButtonLoading(button);
+        errorText.textContent = "";
+        try {
+            const documents = await listDocumentEntries(source, patientId, nextPage);
+            if (!content.contains(button)) return;
+
+            content.querySelector(".doc-table > tbody").insertAdjacentHTML("beforeend", renderDocumentRows(documents));
+            nextPage += 1;
+            if (documents.length < DOCUMENT_LIST_PAGE_SIZE) {
+                button.remove();
+                errorText.remove();
+            }
+        } catch (err) {
+            errorText.textContent = err.message;
+        } finally {
+            restoreButton(button, "Load more");
+        }
+    });
+
+    content.append(button, errorText);
+}
+
+function renderDocumentRows(documents) {
+    return documents
+    .sort((a, b) => a?.documentReference?.title?.localeCompare(b?.documentReference?.title))
+    .map((docRef) => {
         const reference = docRef.documentReference ?? {};
         const entryId = reference.id ?? "";
         const documentId = reference.uniqueId;
@@ -389,7 +433,9 @@ function renderDocumentTable(documents) {
                 <td class="action-column">${editButton} ${duplicateDocumentReference} ${deleteButton} ${saveButton}</td>
             </tr>`;
     }).join("");
+}
 
+function renderDocumentTable(documents) {
     return `
         <table class="doc-table">
             <thead>
@@ -404,7 +450,7 @@ function renderDocumentTable(documents) {
                     <th>Actions</th>
                 </tr>
             </thead>
-            <tbody>${rows}</tbody>
+            <tbody>${renderDocumentRows(documents)}</tbody>
         </table>`;
 }
 

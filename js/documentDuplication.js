@@ -49,10 +49,9 @@ export function clonePatientTableFromDOMAsPatientDuplicationForm() {
     newTable.style.background = "var(--color-bg-surface)";
 
     // Remove the last header row and any existing expand rows or action columns or styling
-    newTable.querySelectorAll("tbody tr").forEach(row => row.classList.remove("btn-docs--active"));
-    newTable.querySelectorAll(".doc-expand-row").forEach(node => node.remove());
-    newTable.querySelectorAll("td.pid-actions").forEach(node => node.remove());
-    newTable.querySelectorAll("td.action-column").forEach(node => node.remove());
-    newTable.querySelectorAll("thead tr th").remove();
+    newTable.querySelectorAll("tbody tr")?.forEach(row => row.classList.remove("btn-docs--active"));
+    newTable.querySelectorAll(".doc-expand-row")?.forEach(node => node.remove());
+    newTable.querySelectorAll("td.pid-actions")?.forEach(node => node.remove());
+    newTable.querySelectorAll("td.action-column")?.forEach(node => node.remove());
     return newTable;
 }

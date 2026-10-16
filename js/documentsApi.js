@@ -9,20 +9,25 @@ export async function listPatients(source) {
     return Array.isArray(data) ? data : Object.values(data ?? {});
 }
 
-export async function listDocumentEntries(source, patientId) {
-    const pageSize = 50;
+export const DOCUMENT_LIST_PAGE_SIZE = 50;
+
+export async function listDocumentEntries(source, patientId, pageNumber = 1) {
+    const params = new URLSearchParams({ id: patientId, pageNumber, pageSize: DOCUMENT_LIST_PAGE_SIZE });
+    const response = await proxyFetch(`${source}/api/rest/document-list?${params}`);
+    await ensureOk(response, "Failed to load document list.");
+
+    const data = await response.json();
+    return data?.documentListEntries ?? [];
+}
+
+export async function listAllDocumentEntries(source, patientId) {
     const entries = [];
 
     for (let pageNumber = 1; ; pageNumber += 1) {
-        const params = new URLSearchParams({ id: patientId, pageNumber, pageSize });
-        const response = await proxyFetch(`${source}/api/rest/document-list?${params}`);
-        await ensureOk(response, "Failed to load document list.");
-
-        const data = await response.json();
-        const pageEntries = data?.documentListEntries ?? [];
+        const pageEntries = await listDocumentEntries(source, patientId, pageNumber);
         entries.push(...pageEntries);
 
-        if (pageEntries.length < pageSize) {
+        if (pageEntries.length < DOCUMENT_LIST_PAGE_SIZE) {
             return entries;
         }
     }
