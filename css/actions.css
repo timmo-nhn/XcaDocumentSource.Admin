@@ -1,10 +1,10 @@
-#action {
+[data-role="action"] {
     margin-top: 2rem;
     padding-top: 1.5rem;
     border-top: 1px solid var(--color-border);
 }
 
-#action h2 {
+[data-role="action"] h2 {
     margin-bottom: 0.75rem;
 }
 

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ATNA Log Exporter Admin</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="stylesheet" href="/css/atna.css">
+    <script type="module" src="/js/atna.js"></script>
+</head>
+<body class="atna-page">
+    <nav class="instance-toolbar" aria-label="Admin pages">
+        <a href="/">XcaDocumentSource Admin</a>
+        <span aria-current="page">ATNA Log Exporter</span>
+    </nav>
+    <h1>ATNA Log Exporter</h1>
+    <form id="connectionForm" class="atna-panel">
+        <div class="atna-fields">
+            <label>Instance
+                <select id="instancePreset">
+                    <option value="https://atna-log-dev.pjd.test.nhn.no">Dev</option>
+                    <option value="https://atna-log.pjd.test.nhn.no" selected>Test</option>
+                    <option value="https://atna-log.pjd.qa.nhn.no">QA</option>
+                    <option value="https://atna-log.pjd.nhn.no">Production</option>
+                    <option value="">Custom</option>
+                </select>
+            </label>
+            <label class="atna-url">Exporter base URL
+                <input id="instanceUrl" type="url" required value="https://atna-log.pjd.test.nhn.no" placeholder="https://exporter.example">
+            </label>
+            <label>API key (optional)
+                <input id="atnaApiKey" type="password" autocomplete="off">
+            </label>
+            <button type="submit">Connect</button>
+        </div>
+    </form>
+    <p id="connectionStatus" role="status" aria-live="polite">Not connected.</p>
+    <p id="connectionError" class="atna-error" role="alert" hidden></p>
+    <main id="atnaContent" hidden>
+        <section class="atna-panel" aria-labelledby="healthHeading">
+            <h2 id="healthHeading">Health</h2>
+            <button id="refreshHealth" type="button">Refresh health</button>
+            <p id="healthStatus" role="status"></p>
+            <div id="healthChecks" class="card-grid"></div>
+        </section>
+        <section class="atna-panel" aria-labelledby="auditHeading">
+            <h2 id="auditHeading">Events</h2>
+            <p>Search the exporter's available audit-event cache. Results are not a complete historical database export. Date inputs use your local time.</p>
+            <form id="searchForm">
+                <div class="atna-fields">
+                    <label>Recorded from<input id="dateFrom" type="datetime-local"></label>
+                    <label>Recorded to<input id="dateTo" type="datetime-local"></label>
+                    <label>Patient identifier<input id="patientIdentifier" placeholder="system|value or value"></label>
+                    <label>Source identifier<input id="sourceIdentifier" placeholder="system|value or value"></label>
+                    <button type="submit">Search</button>
+                </div>
+            </form>
+            <form id="readForm" class="atna-fields">
+                <label>Audit event ID<input id="eventId" required></label>
+                <button type="submit">Read by ID</button>
+            </form>
+            <p id="searchStatus" role="status"></p>
+            <p id="searchError" class="atna-error" role="alert" hidden></p>
+            <div class="atna-table">
+                <table class="pid-table">
+                    <thead><tr><th>Recorded</th><th>ID</th><th>Type</th><th>Action</th><th>Outcome</th><th>Source</th></tr></thead>
+                    <tbody id="auditRows"></tbody>
+                </table>
+            </div>
+        </section>
+        <section class="atna-panel" aria-labelledby="deadLetterHeading">
+            <h2 id="deadLetterHeading">Dead letters</h2>
+            <p>Unresolved observer failures. Requires PostgreSQL on the exporter. Retry re-runs only the failed observer; resolve marks a failure handled without reprocessing it.</p>
+            <form id="deadLetterForm" class="atna-fields">
+                <label>Maximum entries<input id="deadLetterLimit" type="number" value="100" min="1" max="1000" required></label>
+                <button type="submit">Load dead letters</button>
+            </form>
+            <p id="deadLetterStatus" role="status"></p>
+            <p id="deadLetterError" class="atna-error" role="alert" hidden></p>
+            <div class="atna-table">
+                <table class="pid-table">
+                    <thead><tr><th>Failed at</th><th>ID</th><th>Audit event</th><th>Observer</th><th>Retries</th><th>Error</th><th>Actions</th></tr></thead>
+                    <tbody id="deadLetterRows"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

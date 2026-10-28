@@ -11,141 +11,152 @@
 
 <body>
     <h2>XcaDocumentSource Admin</h2>
+    <nav class="instance-toolbar" aria-label="Admin pages">
+        <a href="/atna.html">ATNA Log Exporter</a>
+    </nav>
 
     <div id="inputs">
-        <div id="sourceInputComponent" class="source-selector">
-            <input type="text" id="sourceInput"
-                placeholder="Instance base URL (e.g. https://bjarne-sykehus.t-xcads.pjd.nhn.no)">
-            <button type="button" id="sourceInputToggle" class="source-selector__toggle" aria-label="Toggle source list"
-                aria-expanded="false">▼</button>
-            <ul id="sourceInputMenu" class="source-selector__menu" hidden></ul>
-        </div>
-        <img id="swaggerButton" aria-label="Open Swagger documentation" src="https://cdn.jsdelivr.net/gh/homarr-labs/dashboard-icons/png/swagger.png" alt="Swagger">
-        
-        <input type="password" id="apiKeyInput" placeholder="API key" value="test-123123123">
-        <span id="apiKeyStatus"></span>
+        <input type="password" id="apiKeyInput" aria-label="API key for all instances" placeholder="API key" value="test-123123123">
+        <span id="apiKeyStatus" class="api-key-status" aria-live="polite"></span>
         <button id="submitButton">Connect</button>
-        
-
-        <span id="connectionStatus"></span>
+        <span id="connectionStatus" role="status">Connect to all configured instances.</span>
+    </div>
+    <div id="customConnection" class="instance-toolbar">
+        <input type="url" id="customSourceInput" aria-label="Custom instance URL" placeholder="Override: https://instance.example">
+        <button id="customConnectButton" type="button">Connect instance</button>
+        <span id="customConnectionError" class="error-text" role="alert"></span>
     </div>
 
-    <div id="sourceslist">
-        <div class="source">
-            <div id="statuses" hidden>
-                <section class="status-section">
-                    <h2>Health</h2>
-                    <div id="health-check" class="card-grid"></div>
-                </section>
+    <div id="sourceslist"></div>
 
-                <section class="status-section">
-                    <h2>Configuration</h2>
-                    <div id="about-config" class="card-grid"></div>
-                </section>
-
-                <section class="status-section">
-                    <h2>Implementations</h2>
-                    <div id="backend-implementations" class="card-grid"></div>
-                </section>
-
-                <section class="status-section">
-                    <h2>Registry Objects</h2>
-                    <div id="registry-objects" class="card-grid"></div>
-                </section>
-
-                <section class="status-section">
-                    <h2>Document Entry</h2>
-                    <div id="document-entry" class="card-grid">
-                        <input class="w-512" type="text" id="documentEntryIdInput" placeholder="Document Entry Id">
-                        <button class="btn-edit-document-reference" id="fetchDocumentEntryButton">Fetch</button>
-                    </div>
-                </section>
-
-                <section class="status-section">
-                    <h2>Patient Identifiers</h2>
-                    <div id="patient-identifiers" class="card-grid"></div>
-                </section>
-            </div>
-            
-            <div id="action" hidden>
-                <div id="uploadDocument" class="action-form">
-                    <div>
-                        <h2>Upload document</h2>
-                        <p>Upload one or more documents for a specific patient with randomly generated metadata, or
-                            upload complete document-entry JSON files.<br><sup>Click the upload button (⏫) for one of
-                                the patients to auto-fill this field</sup></p>
-                        <input type="text" class="w-512" id="uploadDocumentPatientIdentifier"
-                            placeholder="Patient identifier">
-    
-                        <label class="file-label">
-                            <input type="file" id="uploadDocumentFile" multiple>
-                            <span id="uploadDocumentLabel">Choose documents</span>
-                        </label>
-                        <button id="uploadDocumentButton">Upload</button>
-                        <pre id="uploadDocumentResponse" hidden></pre>
-                    </div>
+    <template id="instanceTemplate">
+        <details class="source">
+            <summary class="source-summary">
+                <span class="env-badge"></span>
+                <span data-role="instance-name"></span>
+                <span class="instance-health" data-role="health-summary" data-state="loading" role="status">Health: pending</span>
+                <span class="instance-uptime" data-role="uptime-summary">Uptime: unavailable</span>
+                <span data-role="connection-status" class="instance-connection-status" role="status">Connecting...</span>
+            </summary>
+            <div class="source-content">
+                <div class="instance-toolbar">
+                    <span data-role="instance-url"></span>
+                    <a data-role="swagger" target="_blank" rel="noopener noreferrer">Swagger</a>
+                    <button data-role="refresh" type="button">Refresh</button>
                 </div>
-                
-                <div id="generateTestData" class="action-form">
-                    <div>
-                        <h2>Generate Test Data</h2>
+                <p data-role="connection-error" class="error-text" role="alert" hidden></p>
+                <div data-role="statuses" hidden>
+                    <section class="status-section">
+                        <h2>Health</h2>
+                        <div data-role="health-check" class="card-grid"></div>
+                    </section>
 
-                        <input type="number" id="entriesToGenerate" placeholder="Entries to generate" value="10"
-                            min="1">
-                        <input type="text" id="patientIdentifier" placeholder="Patient identifier">
+                    <section class="status-section">
+                        <h2>Configuration</h2>
+                        <div data-role="about-config" class="card-grid"></div>
+                    </section>
 
-                        <label class="file-label">
-                            <input type="file" id="testDataFile" accept=".json">
-                            <span id="fileLabel">Choose .json file</span>
-                        </label>
+                    <section class="status-section">
+                        <h2>Implementations</h2>
+                        <div data-role="backend-implementations" class="card-grid"></div>
+                    </section>
 
-                        <button id="uploadButton">Upload</button>
-                        <pre id="uploadResponse" hidden></pre>
-                    </div>
+                    <section class="status-section">
+                        <h2>Registry Objects</h2>
+                        <div data-role="registry-objects" class="card-grid"></div>
+                    </section>
+
+                    <section class="status-section">
+                        <h2>Document Entry</h2>
+                        <div data-role="document-entry" class="card-grid">
+                            <input class="w-512" type="text" data-role="documentEntryIdInput"
+                                aria-label="Document Entry Id" placeholder="Document Entry Id">
+                            <button class="btn-edit-document-reference" data-role="fetchDocumentEntryButton">Fetch</button>
+                        </div>
+                    </section>
+
+                    <section class="status-section">
+                        <h2>Patient Identifiers</h2>
+                        <div data-role="patient-identifiers" class="card-grid"></div>
+                    </section>
                 </div>
-            </div>
 
-            <div id="jsonEditorOverlay" class="json-editor-overlay" style="display: none;">
-                <div class="json-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="jsonEditorTitle">
-                    <div id="jsonEditorTitle" class="json-editor-title"></div>
-                    <textarea id="jsonEditorTextarea" class="json-editor-textarea"></textarea>
-                    <div class="json-editor-actions">
-                        <button id="jsonEditorCancelButton" type="button" class="json-editor-button">Cancel</button>
-                        <button id="jsonEditorSaveButton" type="button" class="json-editor-button">Save</button>
+                <div data-role="action" hidden>
+                    <div data-role="uploadDocument" class="action-form">
+                        <div>
+                            <h2>Upload document</h2>
+                            <p>Upload one or more documents for a specific patient with randomly generated metadata, or
+                                upload complete document-entry JSON files.<br><sup>Click the upload button (⏫) for one of
+                                    the patients to auto-fill this field</sup></p>
+                            <input type="text" class="w-512" data-role="uploadDocumentPatientIdentifier"
+                                aria-label="Upload patient identifier" placeholder="Patient identifier">
+
+                            <label class="file-label">
+                                <input type="file" data-role="uploadDocumentFile" multiple>
+                                <span data-role="uploadDocumentLabel">Choose documents</span>
+                            </label>
+                            <button data-role="uploadDocumentButton">Upload</button>
+                            <pre data-role="uploadDocumentResponse" hidden></pre>
+                        </div>
                     </div>
-                    <div class="json-editor-actions">
-                        <button id="jsonEditorQuickEditsButton" type="button" class="json-editor-button">Quick
-                            Edits</button>
-                    </div>
 
-                    <div id="jsonQuickEditOverlay" class="json-quick-edit-overlay" style="display: none;">
-                        <div class="json-quick-edit-dialog" role="dialog" aria-modal="true"
-                            aria-labelledby="jsonQuickEditTitle">
-                            <div id="jsonQuickEditTitle" class="json-quick-edit-title">Quick Edits</div>
-                            <div class="json-quick-edit-grid">
-                                <label for="jsonQuickEditDocumentTitle">Document title</label>
-                                <input id="jsonQuickEditDocumentTitle" type="text">
+                    <div data-role="generateTestData" class="action-form">
+                        <div>
+                            <h2>Generate Test Data</h2>
+                            <input type="number" data-role="entriesToGenerate" aria-label="Entries to generate"
+                                placeholder="Entries to generate" value="10" min="1">
+                            <input type="text" data-role="patientIdentifier"
+                                aria-label="Generated data patient identifier" placeholder="Patient identifier">
 
-                                <label for="jsonQuickEditMimeType">MIME type</label>
-                                <input id="jsonQuickEditMimeType" type="text">
-
-                                <label for="jsonQuickEditTypeCode">Document type code</label>
-                                <input id="jsonQuickEditTypeCode" type="text">
-
-                                <label for="jsonQuickEditTypeSystem">Document type system</label>
-                                <input id="jsonQuickEditTypeSystem" type="text">
-                            </div>
-                            <div class="json-quick-edit-actions">
-                                <button id="jsonQuickEditCancelButton" type="button"
-                                    class="json-editor-button">Cancel</button>
-                                <button id="jsonQuickEditApplyButton" type="button"
-                                    class="json-editor-button">Apply</button>
-                            </div>
+                            <label class="file-label">
+                                <input type="file" data-role="testDataFile" accept=".json">
+                                <span data-role="fileLabel">Choose .json file</span>
+                            </label>
+                            <button data-role="uploadButton">Upload</button>
+                            <pre data-role="uploadResponse" hidden></pre>
                         </div>
                     </div>
                 </div>
             </div>
+        </details>
+    </template>
+
+    <div id="jsonEditorOverlay" class="json-editor-overlay" style="display: none;">
+        <div class="json-editor-dialog" role="dialog" aria-modal="true" aria-labelledby="jsonEditorTitle">
+            <div id="jsonEditorTitle" class="json-editor-title"></div>
+            <textarea id="jsonEditorTextarea" class="json-editor-textarea"></textarea>
+            <div class="json-editor-actions">
+                <button id="jsonEditorCancelButton" type="button" class="json-editor-button">Cancel</button>
+                <button id="jsonEditorSaveButton" type="button" class="json-editor-button">Save</button>
+            </div>
+            <div class="json-editor-actions">
+                <button id="jsonEditorQuickEditsButton" type="button" class="json-editor-button">Quick Edits</button>
+            </div>
+
+            <div id="jsonQuickEditOverlay" class="json-quick-edit-overlay" style="display: none;">
+                <div class="json-quick-edit-dialog" role="dialog" aria-modal="true" aria-labelledby="jsonQuickEditTitle">
+                    <div id="jsonQuickEditTitle" class="json-quick-edit-title">Quick Edits</div>
+                    <div class="json-quick-edit-grid">
+                        <label for="jsonQuickEditDocumentTitle">Document title</label>
+                        <input id="jsonQuickEditDocumentTitle" type="text">
+
+                        <label for="jsonQuickEditMimeType">MIME type</label>
+                        <input id="jsonQuickEditMimeType" type="text">
+
+                        <label for="jsonQuickEditTypeCode">Document type code</label>
+                        <input id="jsonQuickEditTypeCode" type="text">
+
+                        <label for="jsonQuickEditTypeSystem">Document type system</label>
+                        <input id="jsonQuickEditTypeSystem" type="text">
+                    </div>
+                    <div class="json-quick-edit-actions">
+                        <button id="jsonQuickEditCancelButton" type="button" class="json-editor-button">Cancel</button>
+                        <button id="jsonQuickEditApplyButton" type="button" class="json-editor-button">Apply</button>
+                    </div>
+                </div>
+            </div>
         </div>
+    </div>
 </body>
 
 </html>

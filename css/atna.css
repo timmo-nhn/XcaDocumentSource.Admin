@@ -1,0 +1,96 @@
+.atna-page {
+    max-width: 1600px;
+}
+
+.atna-panel {
+    padding: 1.25rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    background: var(--color-bg-surface);
+}
+
+.atna-fields {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.atna-fields label {
+    display: grid;
+    gap: 0.4rem;
+    max-width: 100%;
+}
+
+.atna-url {
+    flex: 1 1 350px;
+}
+
+.atna-fields input {
+    width: 100%;
+    min-width: 0;
+}
+
+.atna-page select {
+    padding: 0.45rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    background: var(--purple-900);
+    color: var(--color-text-primary);
+    font: inherit;
+}
+
+.atna-page p {
+    overflow-wrap: anywhere;
+}
+
+.atna-error {
+    color: var(--color-error);
+    white-space: pre-wrap;
+}
+
+.atna-table {
+    overflow-x: auto;
+}
+
+.atna-table .pid-table {
+    margin-inline: 0;
+}
+
+.atna-table td {
+    max-width: 350px;
+    overflow-wrap: anywhere;
+    white-space: pre-wrap;
+    vertical-align: top;
+}
+
+.atna-table button:not(.btn-action-doc) {
+    margin: 0 0.4rem 0.4rem 0;
+}
+
+.atna-table .pid-actions {
+    white-space: nowrap;
+}
+
+.atna-event-row,
+.atna-dead-letter-row {
+    cursor: pointer;
+}
+
+.atna-page pre {
+    max-height: 500px;
+    overflow: auto;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.atna-page [hidden] {
+    display: none !important;
+}
+
+@media (max-width: 600px) {
+    .atna-page { margin: 1rem; }
+    .atna-fields label { width: 100%; }
+}

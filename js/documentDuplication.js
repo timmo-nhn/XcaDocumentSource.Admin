@@ -2,7 +2,7 @@ import { getDocumentEntryById, uploadDocumentEntry } from "./documentsApi.js";
 import { fetchPatientIdentifiers } from "./documents.js";
 import { setNewIdentifiersForDocumentEntry } from "./utils.js";
 
-export async function onDocumentEntryDuplicatePatientClicked(event, source, documentId, backdrop) {
+export async function onDocumentEntryDuplicatePatientClicked(event, source, documentId, backdrop, root) {
     const selectedRow = event.target.closest("#patient-duplication-table tbody tr[data-patient-id]");
     if (!selectedRow) {
         cleanupHandleDuplicateDocumentReference(backdrop);
@@ -29,7 +29,7 @@ export async function onDocumentEntryDuplicatePatientClicked(event, source, docu
         await uploadDocumentEntry(source, documentEntryToDuplicate);
 
         cleanupHandleDuplicateDocumentReference(backdrop);
-        await fetchPatientIdentifiers(source);
+        await fetchPatientIdentifiers(source, root);
     }
 }
 
@@ -40,8 +40,8 @@ function cleanupHandleDuplicateDocumentReference(backdrop) {
     document.body.style.overflow = "";
 }
 
-export function clonePatientTableFromDOMAsPatientDuplicationForm() {
-    const existingTable = document.querySelector("#patient-identifiers table");
+export function clonePatientTableFromDOMAsPatientDuplicationForm(root) {
+    const existingTable = root.querySelector('[data-role="patient-identifiers"] table');
     if (!existingTable) return null;
 
     const newTable = existingTable.cloneNode(true);

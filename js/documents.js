@@ -18,8 +18,8 @@ import { createZipBlob } from "./zip.js";
 
 const LOADING_ICON_HTML = `<img src="/loading.gif" alt="Loading" width="16" height="16">`;
 
-export async function fetchPatientIdentifiers(source, containerInput) {
-    const container = containerInput || document.getElementById("patient-identifiers");
+export async function fetchPatientIdentifiers(source, root) {
+    const container = root.querySelector('[data-role="patient-identifiers"]');
     const patientHeader = container.parentElement.querySelector("h2");
     patientHeader.textContent = "Patients";
     container.innerHTML = `<p class="loading-text">Loading…</p>`;
@@ -41,9 +41,9 @@ export async function fetchPatientIdentifiers(source, containerInput) {
     }
 }
 
-export async function setupFetchDocumentEntryById(source) {
-    const button = document.getElementById("fetchDocumentEntryButton");
-    const input = document.getElementById("documentEntryIdInput");
+export function setupFetchDocumentEntryById(source, root) {
+    const button = root.querySelector('[data-role="fetchDocumentEntryButton"]');
+    const input = root.querySelector('[data-role="documentEntryIdInput"]');
 
     button.addEventListener("click", async () => {
         const documentEntryId = input.value.trim();
@@ -52,7 +52,7 @@ export async function setupFetchDocumentEntryById(source) {
             return;
         }
 
-        await handleEditDocumentReference(button, source, documentEntryId);
+        await handleEditDocumentReference(button, source, documentEntryId, null, root);
     });
 
     input.addEventListener("keydown", async (event) => {
@@ -65,7 +65,7 @@ export async function setupFetchDocumentEntryById(source) {
 
 function renderPatientsTable(patientTableContainer, entries) {
     const sortedEntries = [...entries].sort((a, b) => a?.firstName?.localeCompare(b?.firstName));
-    const renderedPatientRows = sortedEntries.map((entry, index) => renderPatientRow(entry, index)).join("");
+    const renderedPatientRows = sortedEntries.map((entry) => renderPatientRow(entry)).join("");
 
     setPatientHeaderCount(patientTableContainer, entries.length);
     const tableHtml = `
@@ -94,14 +94,13 @@ function setPatientHeaderCount(patientTableContainer, count) {
     patientHeader.textContent = `Patients (${count})`;
 }
 
-function renderPatientRow(entry, index) {
+function renderPatientRow(entry) {
     const patientId = escapeHtml(entry?.patientId?.id ?? "—");
     const patientSystem = escapeHtml(entry?.patientId?.system ?? "—");
     const patientFirstName = escapeHtml(entry?.firstName);
     const patientLastName = escapeHtml(entry?.lastName);
     const dateOfBirth = escapeHtml(entry?.birthTime ? new Date(entry.birthTime).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric" }) : "—");
     const gender = escapeHtml(entry?.gender === "M" ? "♂ Male" : entry?.gender === "F" ? "♀ Female" : entry?.gender ?? "—");
-    const expandId = `expand-${index}`;
 
     return `
         <tr data-patient-id="${entry?.patientId?.id}" data-patient-id-system="${entry?.patientId?.system}" data-patient-first-name="${entry?.firstName}" data-patient-last-name="${entry?.lastName}" data-patient-birthtime="${entry?.birthTime}" data-patient-gender="${entry?.gender}">
@@ -112,7 +111,7 @@ function renderPatientRow(entry, index) {
             <td>${gender}</td>
             <td class="pid-actions"></td>
         </tr>
-        <tr id="${expandId}" class="doc-expand-row">
+        <tr class="doc-expand-row">
             <td colspan="6">
                 <div class="doc-list-content"></div>
             </td>
@@ -240,7 +239,7 @@ function addUploadDocumentButton(row) {
     button.title = "Upload document for this patient (Shift+Click to open the upload form)";
     button.addEventListener("click", (event) => {
         event.stopPropagation();
-        setUploadDocumentField(event, row.dataset.patientId, row.dataset.patientIdSystem);
+        setUploadDocumentField(event, row.dataset.patientId, row.dataset.patientIdSystem, row.closest(".source"));
     });
 
     row.querySelector("td.pid-actions").append(button);
@@ -270,7 +269,7 @@ function addDeleteAllDataButton(row, source) {
         setButtonLoading(button);
         try {
             await deleteAllDataForPatient(source, patientIdentifier, patientSystem);
-            document.getElementById("submitButton").click();
+            row.closest(".source").dispatchEvent(new Event("refresh-instance"));
         } catch (err) {
             alert(`Failed to delete all data for patient.\n\n${err.message}`);
         } finally {
@@ -428,7 +427,7 @@ function renderDocumentRows(documents) {
                 <td>${renderAuthorInstitution(reference?.author)}</td>
                 <td>${reference?.size == null ? "—" : formatSize(Number(reference.size))}</td>
                 <td><small><code title="Document Entry Id">${escapeHtml(documentReferenceId || "—")}</code><br><code title="Document UniqueId">${escapeHtml(documentId || "—")}</code></small></td>
-                <td>${created ? new Date(created).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric" }) : "—"}</td>
+                <td>${created ? new Date(created).toLocaleDateString("no-NO", { year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute:"2-digit" }) : "—"}</td>
                 <td>${escapeHtml(reference?.mimeType ?? reference?.contentType ?? "Unknown")}</td>
                 <td class="action-column">${editButton} ${duplicateDocumentReference} ${deleteButton} ${saveButton}</td>
             </tr>`;
@@ -547,7 +546,7 @@ async function handleDeleteDocument(button, source, patientId, expandRow) {
     }
 }
 
-async function handleEditDocumentReference(button, source, patientIdOrUniqueId, expandRow) {
+async function handleEditDocumentReference(button, source, patientIdOrUniqueId, expandRow, root = button.closest(".source")) {
     const documentEntryId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : patientIdOrUniqueId;
     if (!documentEntryId) {
         throw new Error("Missing document entry id.");
@@ -575,7 +574,7 @@ async function handleEditDocumentReference(button, source, patientIdOrUniqueId, 
                 await loadDocumentList(source, patientIdOrUniqueId, expandRow);
             }
             else {
-                await fetchPatientIdentifiers(source);
+                await fetchPatientIdentifiers(source, root);
             }
         }
     });
@@ -584,14 +583,15 @@ async function handleEditDocumentReference(button, source, patientIdOrUniqueId, 
 async function handleDuplicateDocumentReference(button, source, patientId, expandRow) {
     const documentId = button.dataset.entryId ? decodeURIComponent(button.dataset.entryId) : "";
 
-    const recycledTable = documentDuplication.clonePatientTableFromDOMAsPatientDuplicationForm();
+    const root = button.closest(".source");
+    const recycledTable = documentDuplication.clonePatientTableFromDOMAsPatientDuplicationForm(root);
     const duplicationBackdrop = document.createElement("div");
     duplicationBackdrop.id = "patient-duplication-backdrop";
     duplicationBackdrop.appendChild(recycledTable);
     document.body.appendChild(duplicationBackdrop);
     document.body.style.overflow = "hidden";
 
-    duplicationBackdrop.addEventListener("click", (event) => documentDuplication.onDocumentEntryDuplicatePatientClicked(event, source, documentId, duplicationBackdrop));
+    duplicationBackdrop.addEventListener("click", (event) => documentDuplication.onDocumentEntryDuplicatePatientClicked(event, source, documentId, duplicationBackdrop, root));
 }
 
 async function handleSaveDocument(button, source, patientIdOrUniqueId, expandRow) {

@@ -8,37 +8,33 @@ import {
     setNewIdentifiersForDocumentEntry
 } from "./utils.js";
 
-export function setupActionSection(source) {
-    const actionEl = document.getElementById("action");
+export function setupActionSection(source, root) {
+    const actionEl = root.querySelector('[data-role="action"]');
     actionEl.hidden = false;
 
-    setupUploadTestData(source);
-    setupUploadDocument(source);
+    setupUploadTestData(source, root);
+    setupUploadDocument(source, root);
 }
 
-function setupUploadTestData(source) {
-    const fileInput = document.getElementById("testDataFile");
-    const fileLabelEl = document.getElementById("fileLabel");
-    const uploadButton = document.getElementById("uploadButton");
-    const responseEl = document.getElementById("uploadResponse");
+function setupUploadTestData(source, root) {
+    const fileInput = root.querySelector('[data-role="testDataFile"]');
+    const fileLabelEl = root.querySelector('[data-role="fileLabel"]');
+    const uploadButton = root.querySelector('[data-role="uploadButton"]');
+    const responseEl = root.querySelector('[data-role="uploadResponse"]');
 
     fileInput.addEventListener("change", function () {
         fileLabelEl.textContent = fileInput.files[0]?.name ?? "Choose .json file";
     });
 
-    // Clone to avoid stacking listeners if Connect is clicked multiple times
-    const newUploadButton = uploadButton.cloneNode(true);
-    uploadButton.replaceWith(newUploadButton);
-
-    newUploadButton.addEventListener("click", () => uploadTestData(source, fileInput, responseEl));
+    uploadButton.addEventListener("click", () => uploadTestData(source, fileInput, responseEl, root));
 }
 
-async function uploadTestData(source, fileInput, responseEl) {
+async function uploadTestData(source, fileInput, responseEl, root) {
     const file = fileInput.files[0];
     if (!file) { alert("Please select a .json file first."); return; }
 
-    const entries = document.getElementById("entriesToGenerate").value.trim();
-    const patient = document.getElementById("patientIdentifier").value.trim();
+    const entries = root.querySelector('[data-role="entriesToGenerate"]').value.trim();
+    const patient = root.querySelector('[data-role="patientIdentifier"]').value.trim();
 
     const params = new URLSearchParams();
     if (entries) params.set("entriesToGenerate", entries);
@@ -68,14 +64,14 @@ async function uploadTestData(source, fileInput, responseEl) {
     }
 
     // Refresh the status section to show the new data
-    document.getElementById("submitButton").click();
+    root.dispatchEvent(new Event("refresh-instance"));
 }
 
-async function setupUploadDocument(source) {
-    const fileInput = document.getElementById("uploadDocumentFile");
-    const fileLabelEl = document.getElementById("uploadDocumentLabel");
-    const uploadButton = document.getElementById("uploadDocumentButton");
-    const responseEl = document.getElementById("uploadDocumentResponse");
+function setupUploadDocument(source, root) {
+    const fileInput = root.querySelector('[data-role="uploadDocumentFile"]');
+    const fileLabelEl = root.querySelector('[data-role="uploadDocumentLabel"]');
+    const uploadButton = root.querySelector('[data-role="uploadDocumentButton"]');
+    const responseEl = root.querySelector('[data-role="uploadDocumentResponse"]');
 
     fileInput.onchange = function () {
         const files = [...fileInput.files];
@@ -86,17 +82,12 @@ async function setupUploadDocument(source) {
                 : `${files.length} files selected`;
     };
 
-    // Clone to avoid stacking listeners if Connect is clicked multiple times
-    const newUploadButton = uploadButton.cloneNode(true);
-    uploadButton.replaceWith(newUploadButton);
-
-    newUploadButton.addEventListener("click", () => uploadDocument(source, fileInput, responseEl, newUploadButton));
+    uploadButton.addEventListener("click", () => uploadDocument(source, fileInput, responseEl, uploadButton, root));
 }
 
-export function setUploadDocumentField(event, patientId, patientIdSystem) {
-    const documentUpload = document.getElementById("uploadDocument");
-    const patientIdentifierField = document.getElementById("uploadDocumentPatientIdentifier");
-    const label = documentUpload.querySelector("label");
+export function setUploadDocumentField(event, patientId, patientIdSystem, root) {
+    const documentUpload = root.querySelector('[data-role="uploadDocument"]');
+    const patientIdentifierField = root.querySelector('[data-role="uploadDocumentPatientIdentifier"]');
 
     if (!documentUpload || !patientIdentifierField) {
         throw new Error("Upload document form not found.");
@@ -108,15 +99,15 @@ export function setUploadDocumentField(event, patientId, patientIdSystem) {
     patientIdentifierField.select();
 
     if (event.shiftKey) {
-        label.click();
+        documentUpload.querySelector("label").click();
     }
 }
 
-async function uploadDocument(source, fileInput, responseEl, uploadButton) {
+async function uploadDocument(source, fileInput, responseEl, uploadButton, root) {
     const files = [...fileInput.files];
     if (files.length === 0) { alert("Please select one or more files first."); return; }
 
-    const patient = document.getElementById("uploadDocumentPatientIdentifier").value.trim();
+    const patient = root.querySelector('[data-role="uploadDocumentPatientIdentifier"]').value.trim();
 
     responseEl.hidden = false;
     responseEl.className = "upload-response upload-response--loading";
@@ -140,7 +131,8 @@ async function uploadDocument(source, fileInput, responseEl, uploadButton) {
                 const file = regularFiles[index];
                 const payload = generatedEntries[index];
                 const bytes = new Uint8Array(await file.arrayBuffer());
-                payload.document.data = await fileToBase64(file);
+
+                payload.document = { documentId: payload.documentEntry?.uniqueId ?? "", data: await fileToBase64(file) };
                 payload.documentEntry.mimeType = detectFileType(bytes, file.type).mimeType;
                 payload.documentEntry.size = `${file.size}`;
                 readyEntries.push({ name: file.name, payload });
@@ -165,8 +157,8 @@ async function uploadDocument(source, fileInput, responseEl, uploadButton) {
         responseEl.className = "upload-response upload-response--ok";
         responseEl.textContent = `Uploaded ${results.length} document${results.length === 1 ? "" : "s"}.\n\n${results.join("\n")}`;
         fileInput.value = "";
-        document.getElementById("uploadDocumentLabel").textContent = "Choose documents";
-        document.getElementById("submitButton").click();
+        root.querySelector('[data-role="uploadDocumentLabel"]').textContent = "Choose documents";
+        root.dispatchEvent(new Event("refresh-instance"));
     } catch (err) {
         responseEl.className = "upload-response upload-response--error";
         responseEl.textContent = err.message;

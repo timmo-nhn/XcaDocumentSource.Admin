@@ -5,7 +5,7 @@ import path from "path";
 import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = 8000;
+const PORT = Number(process.env.PORT ?? 8000);
 
 // Equivalent to curl -k — skips TLS certificate validation for the proxy target
 const insecureAgent = new https.Agent({ rejectUnauthorized: false });
@@ -124,19 +124,31 @@ const server = http.createServer(async (req, res) => {
                 }
             }
 
-            const proxyReq = lib.request(targetUrl, { method: req.method, headers: forwardHeaders, agent: insecureAgent }, (proxyRes) => {
+            const agent = targetUrl.protocol === "https:"
+                ? insecureAgent
+                : undefined;
+            const proxyReq = lib.request(targetUrl, { method: req.method, headers: forwardHeaders, agent }, (proxyRes) => {
                 res.writeHead(proxyRes.statusCode, {
                     "Content-Type": proxyRes.headers["content-type"] ?? "application/json",
                     "Access-Control-Allow-Origin": "*",
+                    "Cache-Control": "no-store",
                 });
                 proxyRes.pipe(res);
             });
             
             proxyReq.on("error", (err) => {
                 console.log(err);
-                res.writeHead(502, { "Content-Type": "application/json" });
+                if (res.headersSent) {
+                    res.destroy(err);
+                    return;
+                }
+                res.writeHead(502, {
+                    "Content-Type": "application/json",
+                    "Cache-Control": "no-store",
+                });
                 res.end(JSON.stringify({ error: err.message }));
             });
+            proxyReq.setTimeout(30000, () => proxyReq.destroy(new Error("Upstream request timed out")));
             // Pipe request body (for POST/PUT)
             req.pipe(proxyReq);
         } catch (err) {
@@ -162,5 +174,5 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, () => {
-    console.log(`Admin server running at http://localhost:${PORT}`);
+    console.log(`Admin server running at http://localhost:${server.address().port}`);
 });

@@ -1,21 +1,23 @@
 import { proxyFetch } from "./api.js";
 import { renderCard, capitalize, formatUptime, boolStatus, boolLabel } from "./utils.js";
 
-export async function fetchHealthCheck(source) {
-    const container = document.getElementById("health-check");
+export async function fetchHealthCheck(source, root) {
+    const container = root.querySelector('[data-role="health-check"]');
     container.innerHTML = renderCard("Health Check", "loading", null);
+    updateHealthSummary(root, "loading");
 
     try {
         const res = await proxyFetch(`${source}/api/health-check`);
-        if (!res.ok) console.warn(`HTTP ${res.status}`);
         const data = await res.json();
+        if (!res.ok && !data.healthReport?.status) throw new Error(`HTTP ${res.status}`);
 
         const status = data.healthReport?.status ?? "unknown";
         const isHealthy = status.toLowerCase() === "healthy";
-        const registryOk = data.healthReport?.entries.registry.status === "healthy";
-        const repositoryOk = data.healthReport?.entries.repository.status === "healthy";
-        const atnaLogOk = data.healthReport?.entries.atnalogexport.status === "healthy";
+        const registryOk = data.healthReport?.entries?.registry?.status === "healthy";
+        const repositoryOk = data.healthReport?.entries?.repository?.status === "healthy";
+        const atnaLogOk = data.healthReport?.entries?.atnalogexport?.status === "healthy";
         const uptime = data.uptimeInSeconds != null ? formatUptime(data.uptimeInSeconds) : null;
+        updateHealthSummary(root, status, uptime);
 
         container.innerHTML = `
             ${renderCard("Overall Status", isHealthy ? "ok" : "error", capitalize(status))}
@@ -25,14 +27,26 @@ export async function fetchHealthCheck(source) {
             ${uptime ? renderCard("Uptime", "neutral", uptime) : ""}
         `;
     } catch (err) {
+        updateHealthSummary(root, "unavailable");
         container.innerHTML = renderCard("Health Check", "error", err.message);
     }
 }
 
+export function updateHealthSummary(root, status, uptime = null) {
+    const health = root.querySelector('[data-role="health-summary"]');
+    const normalized = status.toLowerCase();
+    health.dataset.state = normalized === "healthy" ? "ok"
+        : normalized === "degraded" ? "warning"
+        : normalized === "loading" || normalized === "unknown" ? "loading"
+        : "error";
+    health.textContent = `Health: ${capitalize(status)}`;
+    root.querySelector('[data-role="uptime-summary"]').textContent = `Uptime: ${uptime ?? "unavailable"}`;
+}
 
 
-export async function fetchAboutConfig(source) {
-    const container = document.getElementById("about-config");
+
+export async function fetchAboutConfig(source, root) {
+    const container = root.querySelector('[data-role="about-config"]');
     container.innerHTML = renderCard("Config", "loading", null);
 
     try {
@@ -52,8 +66,8 @@ export async function fetchAboutConfig(source) {
     }
 }
 
-export async function fetchRegistryObjectsCount(source) {
-    const container = document.getElementById("registry-objects");
+export async function fetchRegistryObjectsCount(source, root) {
+    const container = root.querySelector('[data-role="registry-objects"]');
     container.innerHTML = renderCard("Registry Objects", "loading", null);
 
     try {
@@ -71,8 +85,8 @@ export async function fetchRegistryObjectsCount(source) {
     }
 }
 
-export async function fetchBackendImplementations(source) {
-    const container = document.getElementById("backend-implementations");
+export async function fetchBackendImplementations(source, root) {
+    const container = root.querySelector('[data-role="backend-implementations"]');
     container.innerHTML = renderCard("Backend Implementations", "loading", null);
 
     try {
