@@ -36,6 +36,7 @@
                 <span data-role="instance-name"></span>
                 <span class="instance-health" data-role="health-summary" data-state="loading" role="status">Health: pending</span>
                 <span class="instance-uptime" data-role="uptime-summary">Uptime: unavailable</span>
+                <span class="instance-dc" data-role="dc-summary" data-state="loading" title="Document entry count per datacenter"></span>
                 <span data-role="connection-status" class="instance-connection-status" role="status">Connecting...</span>
             </summary>
             <div class="source-content">
@@ -43,6 +44,8 @@
                     <span data-role="instance-url"></span>
                     <a data-role="swagger" target="_blank" rel="noopener noreferrer">Swagger</a>
                     <button data-role="refresh" type="button">Refresh</button>
+                    <span class="dc-buttons" data-role="datacenter-buttons" role="group" aria-label="Datacenter"></span>
+                    <span class="dc-active" data-role="datacenter-label" role="status"></span>
                 </div>
                 <p data-role="connection-error" class="error-text" role="alert" hidden></p>
                 <div data-role="statuses" hidden>

@@ -1,4 +1,5 @@
 import { sourceOptions } from "../js/sources.js";
+import { DATACENTERS, datacenterSource } from "../js/status.js";
 
 const originalFetch = globalThis.fetch;
 const originalAlert = globalThis.alert;
@@ -35,8 +36,9 @@ function assertOnlySource(start, source) {
 async function mockFetch(url, options = {}) {
     if (!String(url).startsWith("/proxy?")) return originalFetch(url, options);
     const target = new URL(new URL(url, location.origin).searchParams.get("url"));
-    const source = target.origin;
-    requests.push({ source, path: target.pathname, params: target.searchParams, ...options });
+    const dc = DATACENTERS.find((name) => target.hostname.startsWith(`static-${name}-`)) ?? null;
+    const source = dc ? target.origin.replace(`static-${dc}-`, "") : target.origin;
+    requests.push({ source, dc, path: target.pathname, params: target.searchParams, ...options });
 
     switch (target.pathname) {
         case "/secure":
@@ -68,6 +70,8 @@ async function mockFetch(url, options = {}) {
         case "/api/implementations":
             return Response.json([{ serviceType: "IRegistry", implementationType: source }]);
         case "/api/about/registryobjects":
+            if (dc && source === sourceOptions[3] && dc === "trd") return Response.json({ error: "down" }, { status: 502 });
+            if (dc && source === sourceOptions[4] && dc === "osl") return Response.json({ documentEntries: 50 });
             return Response.json({ documentEntries: 53 });
         case "/api/debug-patient-identifiers":
             return Response.json([0, 1].map((index) => ({
@@ -128,6 +132,18 @@ try {
     }
     assert(role(roots[1], "health-summary").dataset.state === "error", "Failed connection retained healthy state.");
     assert(role(roots[1], "uptime-summary").textContent.includes("unavailable"), "Failed connection retained uptime.");
+    await waitFor(() => roots.filter((root) => root.dataset.state === "connected")
+        .every((root) => role(root, "dc-summary").dataset.state !== "loading"));
+    const dcText = (root) => [...role(root, "dc-summary").querySelectorAll("[data-dc]")].map((item) => item.textContent).join(" ");
+    assert(dcText(roots[0]) === "BG: 53 OSL: 53 TRD: 53", `Wrong DC counts: ${dcText(roots[0])}`);
+    assert(role(roots[0], "dc-summary").dataset.state === "ok", "Matching DC counts not marked ok.");
+    assert(dcText(roots[3]) === "BG: 53 OSL: 53 TRD: —", "Unavailable DC not shown.");
+    assert(role(roots[3], "dc-summary").dataset.state === "ok", "Matching available DC counts not marked ok.");
+    assert(dcText(roots[4]) === "BG: 53 OSL: 50 TRD: 53" && role(roots[4], "dc-summary").dataset.state === "error", "DC mismatch not flagged.");
+    assert(dcText(roots[1]) === "BG: — OSL: — TRD: —", "Failed connection shows DC counts.");
+    const dcRequest = requests.find((request) => request.dc === "osl" && request.source === sourceOptions[0]);
+    assert(dcRequest && dcRequest.path === "/api/about/registryobjects", "DC counts not requested from static-osl- host.");
+    passed.push("Header shows per-datacenter registry object counts and flags mismatches or unavailable datacenters.");
     const ids = [...document.querySelectorAll("[id]")].map((element) => element.id);
     assert(new Set(ids).size === ids.length, "Duplicate DOM IDs.");
     passed.push("All configured instances connect concurrently; status, authentication failures and Swagger links are isolated.");
@@ -266,6 +282,43 @@ try {
     customRoots = [...document.querySelectorAll("#sourceslist > .source")];
     assert(customRoots.length === sourceOptions.length + 1, "Duplicate URL created another accordion.");
     passed.push("Custom URLs append an expanded instance, invalid URLs show errors, and duplicate URLs refresh instead.");
+
+    const initialCount = customRoots.length;
+    const indexOfA = customRoots.indexOf(a);
+    const current = () => document.querySelectorAll("#sourceslist > .source")[indexOfA];
+    const dcButton = (root, dc) => role(root, "datacenter-buttons").querySelector(`[data-dc="${dc}"]`);
+    assert(role(a, "refresh").nextElementSibling === role(a, "datacenter-buttons"), "Datacenter buttons are not next to Refresh.");
+    assert(role(a, "datacenter-buttons").nextElementSibling === role(a, "datacenter-label"), "Datacenter label is not right of the buttons.");
+    assert([...role(a, "datacenter-buttons").querySelectorAll("button")].map((button) => button.textContent).join() === "BG,OSL,TRD", "Missing a button per datacenter.");
+    assert(role(a, "datacenter-label").textContent === "Connected to: default", "Default endpoint not labelled.");
+    assert([...role(a, "dc-summary").children].map((item) => item.dataset.dc).join() === DATACENTERS.join(), "Count badges do not use DATACENTERS.");
+    for (const dc of DATACENTERS) {
+        start = requests.length;
+        dcButton(current(), dc).click();
+        await waitFor(() => current().dataset.datacenter === dc && current().dataset.state === "connected");
+        const dcRoot = current();
+        const target = datacenterSource(sourceOptions[0], dc);
+        assert(document.querySelectorAll("#sourceslist > .source").length === initialCount, "Switching datacenter appended an accordion.");
+        assert(dcRoot.open && dcRoot.dataset.source === target, `Did not switch to ${dc}.`);
+        assert(role(dcRoot, "datacenter-label").textContent === `Connected to: ${dc.toUpperCase()}`, "Wrong datacenter label.");
+        assert(dcButton(dcRoot, dc).getAttribute("aria-pressed") === "true", "Active datacenter button not pressed.");
+        assert(requests.slice(start).some((request) => request.dc === dc && request.path === "/secure"), `Did not authenticate against ${dc}.`);
+        assert(role(dcRoot, "swagger").href === `${target}/swagger`, "Datacenter Swagger target is wrong.");
+        start = requests.length;
+        role(dcRoot, "documentEntryIdInput").value = "datacenter-entry";
+        role(dcRoot, "fetchDocumentEntryButton").click();
+        await waitFor(() => document.getElementById("jsonEditorOverlay").style.display === "flex");
+        const documentRequests = requests.slice(start).filter((request) => request.path === "/api/rest/document-entry");
+        assert(documentRequests.length === 1 && documentRequests[0].dc === dc, "Document action escaped the selected datacenter.");
+        document.getElementById("jsonEditorCancelButton").click();
+    }
+    const lastDc = DATACENTERS.at(-1);
+    dcButton(current(), lastDc).click();
+    await waitFor(() => !current().dataset.datacenter && current().dataset.state === "connected");
+    assert(current().dataset.source === sourceOptions[0] && role(current(), "datacenter-label").textContent === "Connected to: default", "Clicking the active datacenter did not return to default.");
+    assert(document.querySelectorAll("#sourceslist > .source").length === initialCount, "Returning to default appended an accordion.");
+    assert(datacenterSource("https://static-bg-example.test:8443/base", "osl") === "https://static-osl-example.test:8443/base", "Datacenter switch did not preserve the port and base path.");
+    passed.push("Datacenter buttons switch the existing accordion in place, label the active datacenter, and toggle back to default.");
 
     document.getElementById("submitButton").click();
     await waitFor(() => !document.getElementById("submitButton").disabled);

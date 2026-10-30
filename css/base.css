@@ -156,6 +156,47 @@ button:hover {
     color: var(--color-error);
 }
 
+.instance-dc {
+    font-size: 0.8rem;
+    color: var(--color-text-secondary);
+}
+
+.instance-dc > span {
+    margin-right: 0.5rem;
+}
+
+.instance-dc > span[data-state="error"] {
+    color: var(--color-error);
+}
+
+.instance-dc[data-state="ok"] > span[data-state="ok"] {
+    color: var(--color-success);
+}
+
+.instance-dc[data-state="warning"] > span[data-state="ok"] {
+    color: var(--color-yellow);
+}
+
+.instance-dc[data-state="error"] > span[data-state="ok"] {
+    color: var(--color-error);
+}
+
+.dc-buttons {
+    display: inline-flex;
+    gap: 0.25rem;
+}
+
+.dc-buttons > button[aria-pressed="true"] {
+    outline: 2px solid var(--color-success);
+    outline-offset: 1px;
+    font-weight: bold;
+}
+
+.dc-active {
+    font-size: 0.85rem;
+    color: var(--color-text-secondary);
+}
+
 #customSourceInput {
     width: min(100%, 450px);
 }

@@ -1,5 +1,5 @@
 import { setApiKey, proxyFetch } from "./api.js";
-import { fetchHealthCheck, fetchAboutConfig, fetchRegistryObjectsCount, fetchBackendImplementations, updateHealthSummary } from "./status.js";
+import { DATACENTERS, datacenterSource, fetchHealthCheck, fetchAboutConfig, fetchRegistryObjectsCount, fetchBackendImplementations, updateHealthSummary, fetchDatacenterCounts, resetDatacenterCounts } from "./status.js";
 import { fetchPatientIdentifiers, setupFetchDocumentEntryById } from "./documents.js";
 import { setupActionSection } from "./actions.js";
 import { sourceOptions } from "./sources.js";
@@ -32,7 +32,7 @@ submitButton.addEventListener("click", async () => {
     apiKeyStatus.textContent = "";
     customConnectionError.textContent = "";
 
-    const instances = sourceOptions.map(createInstance);
+    const instances = sourceOptions.map((source) => createInstance(source));
     sourcesList.append(...instances);
 
     updateConnectionStatus();
@@ -66,7 +66,11 @@ customConnectButton.addEventListener("click", async () => {
     const source = url.href.replace(/\/+$/, "");
     setApiKey(apiKeyInput.value.trim());
     apiKeyStatus.textContent = "";
-    const existing = [...sourcesList.children].find((root) => root.dataset.source === source);
+    await connectSource(source);
+});
+
+async function connectSource(source) {
+    const existing = [...sourcesList.children].find((root) => root.dataset.source === source || root.dataset.baseSource === source);
     if (existing) {
         existing.open = true;
         existing.querySelector('[data-role="refresh"]').click();
@@ -82,7 +86,7 @@ customConnectButton.addEventListener("click", async () => {
     } finally {
         setConnecting(false);
     }
-});
+}
 
 function setConnecting(connecting) {
     submitButton.disabled = connecting;
@@ -98,15 +102,55 @@ function updateConnectionStatus() {
     connectionStatus.textContent = `${connected}/${instances.length} connected, ${failed} failed${pending ? `, ${pending} connecting` : ""}`;
 }
 
-function createInstance(source) {
+function createInstance(baseSource, datacenter = null) {
+    const host = new URL(baseSource).hostname;
+    const prefixed = DATACENTERS.find((dc) => host.startsWith(`static-${dc}-`));
+    if (prefixed) {
+        datacenter ??= prefixed;
+        const url = new URL(baseSource);
+        url.hostname = host.slice(`static-${prefixed}-`.length);
+        baseSource = url.href.replace(/\/+$/, "");
+    }
+    const source = datacenter ? datacenterSource(baseSource, datacenter) : baseSource;
     const root = instanceTemplate.content.firstElementChild.cloneNode(true);
     root.dataset.source = source;
-    root.querySelector('[data-role="instance-name"]').textContent = new URL(source).host;
+    root.dataset.baseSource = baseSource;
+    if (datacenter) root.dataset.datacenter = datacenter;
+    root.querySelector('[data-role="instance-name"]').textContent = new URL(baseSource).host;
     root.querySelector('[data-role="instance-url"]').textContent = source;
-    root.querySelector(".env-badge").dataset.environment = getEnvironment(source);
+    root.querySelector(".env-badge").dataset.environment = getEnvironment(baseSource);
     const swaggerLink = root.querySelector('[data-role="swagger"]');
     swaggerLink.href = `${source}/swagger`;
+    const datacenterButtons = root.querySelector('[data-role="datacenter-buttons"]');
+    const datacenterCounts = root.querySelector('[data-role="dc-summary"]');
+    for (const dc of DATACENTERS) {
+        const count = document.createElement("span");
+        count.dataset.dc = dc;
+        count.textContent = `${dc.toUpperCase()}: —`;
+        datacenterCounts.append(count);
+
+        const button = document.createElement("button");
+        button.type = "button";
+        button.dataset.dc = dc;
+        button.textContent = dc.toUpperCase();
+        button.setAttribute("aria-pressed", String(dc === datacenter));
+        button.title = dc === datacenter
+            ? "Switch back to the default endpoint"
+            : `Switch to ${datacenterSource(baseSource, dc)}`;
+        button.addEventListener("click", () => switchDatacenter(root, dc === datacenter ? null : dc));
+        datacenterButtons.append(button);
+    }
+    root.querySelector('[data-role="datacenter-label"]').textContent =
+        `Connected to: ${datacenter ? datacenter.toUpperCase() : "default"}`;
     return root;
+}
+
+async function switchDatacenter(root, datacenter) {
+    const replacement = createInstance(root.dataset.baseSource, datacenter);
+    replacement.open = root.open;
+    root.replaceWith(replacement);
+    updateConnectionStatus();
+    await connectInstance(replacement);
 }
 
 async function connectInstance(root) {
@@ -143,6 +187,8 @@ async function connectInstance(root) {
             root.querySelector('[data-role="statuses"]').hidden = false;
             root.querySelector('[data-role="action"]').hidden = false;
             status.textContent = "Loading...";
+            // Not awaited: unreachable datacenters may hang until the proxy timeout.
+            fetchDatacenterCounts(root.dataset.baseSource, root);
             await Promise.all([
                 fetchHealthCheck(source, root),
                 fetchAboutConfig(source, root),
@@ -157,6 +203,7 @@ async function connectInstance(root) {
             root.dataset.state = "error";
             status.textContent = "Connection failed";
             updateHealthSummary(root, "unavailable");
+            resetDatacenterCounts(root);
             error.textContent = err.message;
             error.hidden = false;
             root.querySelector('[data-role="statuses"]').hidden = true;

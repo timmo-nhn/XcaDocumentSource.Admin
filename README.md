@@ -1,5 +1,6 @@
 # XcaDocumentSource.Admin
 Admin frontend for XcaDocumentSource
+<<<<<<< HEAD
 
 Enter the shared API key and click **Connect** to connect to every configured
 instance concurrently. Instances are configured in [js/sources.js](js/sources.js).
@@ -17,6 +18,17 @@ Each accordion header shows a compact health indicator and the last reported
 uptime, even while collapsed. Refresh updates these values; unavailable health
 checks or failed connections are shown explicitly instead of retaining stale
 health information.
+
+The header also shows the document entry count from
+`/api/about/registryobjects` for each datacenter (BG, OSL, TRD), queried via
+the instance URL with the host prefixed by `static-bg-`, `static-osl-` and
+`static-trd-`. Counts are green when all match and yellow when they differ or
+a datacenter is unavailable (shown as `—`; hover for details).
+
+Use the **BG**, **OSL** and **TRD** buttons next to **Refresh** to point the
+existing accordion at that datacenter's `static-<dc>-` host. A label to the
+right of the buttons shows the current target (`Connected to: OSL`, or
+`default`). Click the active datacenter again to return to the default URL.
 
 Actions and automatic refreshes affect only their own instance. Use **Refresh**
 inside an accordion to reload that instance or retry a failed connection.
@@ -75,3 +87,5 @@ use a port other than the default `8000`.
 With the admin server running, open `/tests/multiInstance.html` to run the
 multi-instance browser regression checks. These use mocked API responses and
 do not connect to or modify real instances.
+=======
+>>>>>>> 2802192493c39ce276fa6d77ef47d2c064457dbc
